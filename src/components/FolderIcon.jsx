@@ -1,16 +1,21 @@
 import { useIconSource } from '../hooks/useIconSource';
 import { useEffect, useRef } from 'react';
+import { getLetterBackgroundColor, getLetterLabel, letterTileClassName, letterTileStyle } from '../utils/letterIcon';
+import LetterIconGlyph from './LetterIconGlyph';
 
 const MiniIcon = ({ item }) => {
     const iconSrc = useIconSource(item);
+    const letterBg = getLetterBackgroundColor(item.customIcon);
+    const letter = getLetterLabel(item.customIcon, item.title);
 
     return (
         <div className="aspect-square rounded-md overflow-hidden liquid-glass-mini flex items-center justify-center">
              {item.customIcon?.type === 'letter' ? (
-                <div className="w-full h-full flex items-center justify-center bg-linear-to-br from-blue-500 to-purple-600 rounded-md">
-                    <span className="text-[8px] font-bold text-white">
-                        {(item.customIcon.letter || item.title?.[0] || 'A').toUpperCase()}
-                    </span>
+                <div
+                    className={letterTileClassName(letterBg, 'w-full h-full flex items-center justify-center overflow-hidden rounded-md')}
+                    style={letterTileStyle(letterBg)}
+                >
+                    <LetterIconGlyph text={letter} compact />
                 </div>
             ) : (
                 iconSrc ? (

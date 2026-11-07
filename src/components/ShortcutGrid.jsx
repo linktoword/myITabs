@@ -4,6 +4,8 @@ import { useIconSource } from '../hooks/useIconSource';
 import EditShortcutModal from './EditShortcutModal';
 import FolderIcon from './FolderIcon';
 import FolderModal from './FolderModal';
+import { getLetterBackgroundColor, getLetterLabel, letterTileClassName, letterTileStyle, letterFallbackHtml, LETTER_TILE_BOX_STYLE } from '../utils/letterIcon';
+import LetterIconGlyph from './LetterIconGlyph';
 import {
     DndContext,
     closestCenter,
@@ -37,14 +39,17 @@ const calculateGaps = (cols, rows) => {
 
 const createFolderId = () => `folder-${Date.now()}`;
 
-const WebsiteShortcutIcon = ({ shortcut, iconSize, isContextOpen, onRemove, onEdit, setContextShortcutId }) => {
+const WebsiteShortcutIcon = ({ shortcut, iconSize, isContextOpen, onRemove, onEdit, setContextShortcutId, showIconBackground = false }) => {
     const iconSrc = useIconSource(shortcut);
     const iconRef = useRef(null);
+    const letter = getLetterLabel(shortcut.customIcon, shortcut.title);
+    const letterBg = getLetterBackgroundColor(shortcut.customIcon);
+    const isLetterIcon = shortcut.customIcon?.type === 'letter' || iconSrc === false;
 
-    // 动态光泽效果
+    // 动态光泽效果：字母图标始终有色块，不需要玻璃板光泽；图片图标仅在开启「图标背景」时启用
     useEffect(() => {
         const element = iconRef.current;
-        if (!element) return;
+        if (!element || isLetterIcon || !showIconBackground) return;
 
         const handleMouseMove = (e) => {
             const rect = element.getBoundingClientRect();
@@ -56,7 +61,16 @@ const WebsiteShortcutIcon = ({ shortcut, iconSize, isContextOpen, onRemove, onEd
 
         element.addEventListener('mousemove', handleMouseMove);
         return () => element.removeEventListener('mousemove', handleMouseMove);
-    }, []);
+    }, [showIconBackground, isLetterIcon]);
+
+    // 字母图标：始终显示色块，不受 showIconBackground 影响
+    // 图片图标：开启时用玻璃板，关闭时只保留圆角图片
+    const showGlassPlate = !isLetterIcon && showIconBackground;
+    const plateClass = showGlassPlate
+        ? 'rounded-[22px] liquid-glass-icon flex items-center justify-center overflow-hidden h-full w-full'
+        : 'rounded-[22px] flex items-center justify-center overflow-hidden h-full w-full bg-transparent';
+
+    const fallbackHtml = letterFallbackHtml(letter, letterBg);
 
     return (
         <div
@@ -65,14 +79,15 @@ const WebsiteShortcutIcon = ({ shortcut, iconSize, isContextOpen, onRemove, onEd
         >
             <div
                 ref={iconRef}
-                className="rounded-[22px] liquid-glass-icon flex items-center justify-center overflow-hidden h-full w-full"
+                className={plateClass}
             >
-                <div className="glass-refraction" />
-                {(shortcut.customIcon?.type === 'letter' || iconSrc === false) ? (
-                    <div className="flex items-center justify-center bg-linear-to-br from-blue-500 to-purple-600 rounded-[22px]" style={{ width: '80%', height: '80%' }}>
-                        <span className="text-3xl font-bold text-white">
-                            {(shortcut.customIcon?.letter || shortcut.title?.[0] || 'A').toUpperCase()}
-                        </span>
+                {showGlassPlate && <div className="glass-refraction" />}
+                {isLetterIcon ? (
+                    <div
+                        className={letterTileClassName(letterBg, 'flex items-center justify-center overflow-hidden rounded-[22px]')}
+                        style={letterTileStyle(letterBg, LETTER_TILE_BOX_STYLE)}
+                    >
+                        <LetterIconGlyph text={letter} />
                     </div>
                 ) : (
                     iconSrc ? (
@@ -91,11 +106,11 @@ const WebsiteShortcutIcon = ({ shortcut, iconSize, isContextOpen, onRemove, onEd
                             onError={(e) => {
                                 if (!e.target.parentElement) return;
                                 e.target.style.display = 'none';
-                                e.target.parentElement.innerHTML = `<div class="flex items-center justify-center bg-linear-to-br from-blue-500 to-purple-600 rounded-[22px]" style="width: 80%; height: 80%;"><span class="text-3xl font-bold text-white">${(shortcut.title?.[0] || 'A').toUpperCase()}</span></div>`;
+                                e.target.parentElement.innerHTML = fallbackHtml;
                             }}
                         />
                     ) : (
-                        <div className="w-full h-full bg-gray-50 animate-pulse" />
+                        <div className={`w-full h-full animate-pulse ${showIconBackground ? 'bg-gray-50' : 'bg-white/10 rounded-full'}`} />
                     )
                 )}
             </div>
@@ -150,7 +165,8 @@ const SortableShortcutItem = ({
     onRemoveShortcut, 
     setEditingShortcut,
     onOpenFolder,
-    isMergeTarget
+    isMergeTarget,
+    showIconBackground = false,
 }) => {
     const {
         attributes,
@@ -210,6 +226,7 @@ const SortableShortcutItem = ({
                     onRemove={onRemoveShortcut}
                     onEdit={setEditingShortcut}
                     setContextShortcutId={setContextShortcutId}
+                    showIconBackground={showIconBackground}
                 />
                 {isMergeTarget && (
                     <div 
@@ -226,7 +243,7 @@ const SortableShortcutItem = ({
 };
 
 const ShortcutGrid = ({ config, shortcuts, onRemoveShortcut, onEditShortcut, onReorder, leftOffset = 0 }) => {
-    const { cols = 5, rows = 3, iconSize = 96 } = config || {};
+    const { cols = 5, rows = 3, iconSize = 96, showIconBackground = false } = config || {};
     const [currentPage, setCurrentPage] = useState(0);
     const [contextShortcutId, setContextShortcutId] = useState(null);
     const [editingShortcut, setEditingShortcut] = useState(null);
@@ -733,6 +750,7 @@ const ShortcutGrid = ({ config, shortcuts, onRemoveShortcut, onEditShortcut, onR
                                             setEditingShortcut={setEditingShortcut}
                                             onOpenFolder={handleOpenFolder}
                                             isMergeTarget={mergeTargetId === shortcut.id}
+                                            showIconBackground={showIconBackground}
                                         />
                                     ))}
                                 </div>
@@ -755,6 +773,7 @@ const ShortcutGrid = ({ config, shortcuts, onRemoveShortcut, onEditShortcut, onR
                                          shortcut={shortcut} 
                                          iconSize={iconSize} 
                                          isContextOpen={false}
+                                         showIconBackground={showIconBackground}
                                      />
                                      <span className="text-sm font-medium text-white/90 drop-shadow-md truncate w-full text-center px-1 select-none">
                                          {shortcut.title}
@@ -830,6 +849,7 @@ const ShortcutGrid = ({ config, shortcuts, onRemoveShortcut, onEditShortcut, onR
                 onUpdate={handleFolderUpdate}
                 onDelete={handleFolderDelete}
                 onEditShortcut={setEditingShortcut}
+                showIconBackground={showIconBackground}
             />
         </DndContext>
     );

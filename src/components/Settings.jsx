@@ -6,6 +6,7 @@ import IconSelector from './IconSelector';
 import ToastContainer from './Toast';
 import { useToast } from '../hooks/useToast';
 import syncService from '../services/syncService';
+import { getLetterLabel } from '../utils/letterIcon';
 
 const Settings = ({
     gridConfig,
@@ -207,6 +208,22 @@ const Settings = ({
                                                     </button>
                                                 </div>
                                             )}
+
+                                            {/* Icon Background Toggle */}
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-sm text-white/80">图标背景</label>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onConfigChange({ showIconBackground: !gridConfig.showIconBackground })}
+                                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${gridConfig.showIconBackground ? 'bg-blue-600' : 'bg-white/20'
+                                                        }`}
+                                                >
+                                                    <span
+                                                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${gridConfig.showIconBackground ? 'translate-x-6' : 'translate-x-1'
+                                                            }`}
+                                                    />
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -400,13 +417,17 @@ const AddShortcutForm = ({ onAddShortcut, showToast }) => {
             const domain = new URL(finalUrl).hostname;
             const displayTitle = capitalize(formTitle) || title || deriveTitleFromUrl(urlInput) || capitalize(domain);
             
-            // If no icon is selected, default to letter icon
+            // If no icon is selected, default to letter icon (up to 4 chars)
             let finalIcon = selectedIcon;
             if (!finalIcon) {
-                const firstChar = displayTitle[0] || 'A';
                 finalIcon = {
                     type: 'letter',
-                    letter: firstChar.toUpperCase()
+                    letter: getLetterLabel(null, displayTitle)
+                };
+            } else if (finalIcon.type === 'letter') {
+                finalIcon = {
+                    ...finalIcon,
+                    letter: getLetterLabel(finalIcon, displayTitle)
                 };
             }
 

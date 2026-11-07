@@ -17,16 +17,20 @@ import syncService from './services/syncService';
 
 const DEFAULT_BG_URL = 'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?q=80&w=2070&auto=format&fit=crop';
 
+const DEFAULT_GRID_CONFIG = {
+  cols: 8,
+  rows: 4,
+  iconSize: 80,
+  showSearchBar: true,
+  showIconBackground: false,
+};
+
 function App() {
   const [bgUrl, setBgUrl] = useState(localStorage.getItem('bg_url') || DEFAULT_BG_URL);
   const [gridConfig, setGridConfig] = useState(() => {
     const saved = localStorage.getItem('grid_config');
-    return saved ? JSON.parse(saved) : {
-      cols: 8,
-      rows: 4,
-      iconSize: 80,
-      showSearchBar: true
-    };
+    if (!saved) return { ...DEFAULT_GRID_CONFIG };
+    return { ...DEFAULT_GRID_CONFIG, ...JSON.parse(saved) };
   });
   const [bgConfig, setBgConfig] = useState(() => {
     const saved = localStorage.getItem('bg_config');
@@ -135,8 +139,9 @@ function App() {
         }
         if (cloudData.gridConfig) {
           console.log('Updating gridConfig:', cloudData.gridConfig);
-          setGridConfig(cloudData.gridConfig);
-          localStorage.setItem('grid_config', JSON.stringify(cloudData.gridConfig));
+          const mergedGrid = { ...DEFAULT_GRID_CONFIG, ...cloudData.gridConfig };
+          setGridConfig(mergedGrid);
+          localStorage.setItem('grid_config', JSON.stringify(mergedGrid));
           updated = true;
         }
         if (cloudData.bgConfig) {
@@ -542,8 +547,9 @@ function App() {
 
     // Import grid config
     if (data.gridConfig && typeof data.gridConfig === 'object') {
-      setGridConfig(data.gridConfig);
-      localStorage.setItem('grid_config', JSON.stringify(data.gridConfig));
+      const mergedGrid = { ...DEFAULT_GRID_CONFIG, ...data.gridConfig };
+      setGridConfig(mergedGrid);
+      localStorage.setItem('grid_config', JSON.stringify(mergedGrid));
       importedCount++;
     }
 

@@ -1,9 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Upload, Check } from 'lucide-react';
 import { getAllIconUrls } from '../utils/icons';
+import { LETTER_COLOR_PICKER_DEFAULT, getLetterLabel, letterTileClassName, letterTileStyle } from '../utils/letterIcon';
+import LetterIconGlyph from './LetterIconGlyph';
 
 const IconSelector = ({ url, title, onSelect, selectedIcon }) => {
     const [iconPreviews, setIconPreviews] = useState([]);
+    const [backgroundColor, setBackgroundColor] = useState(
+        selectedIcon?.backgroundColor || LETTER_COLOR_PICKER_DEFAULT
+    );
     const selectedSource = selectedIcon?.type === 'custom'
         ? 'custom'
         : selectedIcon?.type === 'letter'
@@ -11,17 +16,22 @@ const IconSelector = ({ url, title, onSelect, selectedIcon }) => {
             : selectedIcon?.source || null;
     const customIcon = selectedIcon?.type === 'custom' ? selectedIcon.data : null;
 
+    useEffect(() => {
+        if (selectedIcon?.type === 'letter' && selectedIcon.backgroundColor) {
+            setBackgroundColor(selectedIcon.backgroundColor);
+        }
+    }, [selectedIcon]);
+
     const initialLetterIcon = useMemo(() => {
         if (!url) return null;
         try {
-            // Use title if available, otherwise fallback to domain
-            let letter;
-            if (title && title.trim()) {
-                letter = title[0].toUpperCase();
-            } else {
+            // Up to 4 chars from title, else domain
+            let sourceText = title && title.trim() ? title.trim() : '';
+            if (!sourceText) {
                 const domain = new URL(url).hostname.replace(/^www\./, '');
-                letter = (domain[0] || 'A').toUpperCase();
+                sourceText = domain || 'A';
             }
+            const letter = getLetterLabel({ letter: sourceText }, sourceText);
             return {
                 source: 'letter',
                 letter,
@@ -31,6 +41,20 @@ const IconSelector = ({ url, title, onSelect, selectedIcon }) => {
             return null;
         }
     }, [url, title]);
+
+    // Keep letter text in sync with title (max 4 chars) while letter icon is selected
+    useEffect(() => {
+        if (selectedSource !== 'letter') return;
+        const nextLetter = initialLetterIcon?.letter || getLetterLabel(selectedIcon, title);
+        if (!nextLetter) return;
+        if (selectedIcon?.letter === nextLetter) return;
+        onSelect({
+            type: 'letter',
+            letter: nextLetter,
+            backgroundColor: selectedIcon?.backgroundColor || backgroundColor,
+        });
+    }, [title, initialLetterIcon, selectedSource]);
+
 
     useEffect(() => {
         let abort = false;
@@ -70,9 +94,17 @@ const IconSelector = ({ url, title, onSelect, selectedIcon }) => {
 
     const handleIconSelect = (source, iconUrl) => {
         if (source === 'letter') {
-            onSelect({ type: 'letter', letter: iconUrl });
+            onSelect({ type: 'letter', letter: iconUrl, backgroundColor });
         } else {
             onSelect({ type: 'source', source, url: iconUrl });
+        }
+    };
+
+    const handleBackgroundColorChange = (color) => {
+        setBackgroundColor(color);
+        if (selectedSource === 'letter') {
+            const letter = selectedIcon?.letter || initialLetterIcon?.letter || 'A';
+            onSelect({ type: 'letter', letter, backgroundColor: color });
         }
     };
 
@@ -107,6 +139,10 @@ const IconSelector = ({ url, title, onSelect, selectedIcon }) => {
         );
     }
 
+    const letterPreviewColor = selectedSource === 'letter'
+        ? (selectedIcon?.backgroundColor || backgroundColor)
+        : backgroundColor;
+
     return (
         <div className="space-y-3">
             <label className="text-xs text-white/60">Choose Icon</label>
@@ -125,8 +161,11 @@ const IconSelector = ({ url, title, onSelect, selectedIcon }) => {
                         title={icon.name}
                     >
                         {icon.source === 'letter' ? (
-                            <div className="w-full h-full bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-xl">
-                                {icon.letter}
+                            <div
+                                className={`w-full h-full flex items-center justify-center overflow-hidden ${letterTileClassName(letterPreviewColor)}`}
+                                style={letterTileStyle(letterPreviewColor)}
+                            >
+                                <LetterIconGlyph text={icon.letter} compact />
                             </div>
                         ) : (
                             <img
@@ -179,6 +218,28 @@ const IconSelector = ({ url, title, onSelect, selectedIcon }) => {
                     )}
                 </label>
             </div>
+
+            {/* Letter background color — shown when letter icon is selected */}
+            {selectedSource === 'letter' && (
+                <div className="flex items-center justify-between gap-3 py-1">
+                    <div>
+                        <label className="text-sm text-white/80">文字图标背景色</label>
+                        <p className="text-xs text-white/40">仅对首字母图标生效</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="color"
+                            value={letterPreviewColor || LETTER_COLOR_PICKER_DEFAULT}
+                            onChange={(e) => handleBackgroundColorChange(e.target.value)}
+                            className="h-8 w-10 cursor-pointer rounded border border-white/20 bg-transparent p-0.5"
+                            title="选择背景颜色"
+                        />
+                        <span className="text-xs font-mono text-white/60 w-16">
+                            {(letterPreviewColor || LETTER_COLOR_PICKER_DEFAULT).toUpperCase()}
+                        </span>
+                    </div>
+                </div>
+            )}
 
             <p className="text-xs text-white/40">
                 Click an icon to select, or upload your own (max 500KB)

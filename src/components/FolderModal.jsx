@@ -10,8 +10,10 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useIconSource } from '../hooks/useIconSource';
+import { getLetterBackgroundColor, getLetterLabel, letterTileClassName, letterTileStyle, LETTER_TILE_BOX_STYLE } from '../utils/letterIcon';
+import LetterIconGlyph from './LetterIconGlyph';
 
-const SortableFolderItem = ({ shortcut, onRemove, onEdit, isContextOpen, setContextShortcutId }) => {
+const SortableFolderItem = ({ shortcut, onRemove, onEdit, isContextOpen, setContextShortcutId, showIconBackground = false }) => {
     const {
         attributes,
         listeners,
@@ -31,10 +33,14 @@ const SortableFolderItem = ({ shortcut, onRemove, onEdit, isContextOpen, setCont
     const iconSrc = useIconSource(shortcut);
     const iconRef = useRef(null);
 
-    // 动态光泽效果
+    const letter = getLetterLabel(shortcut.customIcon, shortcut.title);
+    const letterBg = getLetterBackgroundColor(shortcut.customIcon);
+    const isLetterIcon = shortcut.customIcon?.type === 'letter';
+
+    // 动态光泽效果：仅图片图标且开启「图标背景」时启用
     useEffect(() => {
         const element = iconRef.current;
-        if (!element) return;
+        if (!element || isLetterIcon || !showIconBackground) return;
 
         const handleMouseMove = (e) => {
             const rect = element.getBoundingClientRect();
@@ -46,7 +52,7 @@ const SortableFolderItem = ({ shortcut, onRemove, onEdit, isContextOpen, setCont
 
         element.addEventListener('mousemove', handleMouseMove);
         return () => element.removeEventListener('mousemove', handleMouseMove);
-    }, []);
+    }, [showIconBackground, isLetterIcon]);
 
     const handleOpen = () => {
         if (isContextOpen) {
@@ -57,6 +63,11 @@ const SortableFolderItem = ({ shortcut, onRemove, onEdit, isContextOpen, setCont
             window.open(shortcut.url, '_self');
         }
     };
+
+    const showGlassPlate = !isLetterIcon && showIconBackground;
+    const plateClass = showGlassPlate
+        ? 'w-full h-full rounded-xl liquid-glass-icon flex items-center justify-center overflow-hidden'
+        : 'w-full h-full rounded-xl flex items-center justify-center overflow-hidden bg-transparent';
 
     return (
         <div
@@ -84,13 +95,14 @@ const SortableFolderItem = ({ shortcut, onRemove, onEdit, isContextOpen, setCont
             tabIndex={0}
         >
             <div className="relative w-16 h-16">
-                <div ref={iconRef} className="w-full h-full rounded-xl liquid-glass-icon flex items-center justify-center overflow-hidden">
-                    <div className="glass-refraction" />
-                    {shortcut.customIcon?.type === 'letter' ? (
-                        <div className="flex items-center justify-center bg-linear-to-br from-blue-500 to-purple-600 rounded-xl" style={{ width: '80%', height: '80%' }}>
-                            <span className="text-xl font-bold text-white">
-                                {(shortcut.customIcon.letter || shortcut.title?.[0] || 'A').toUpperCase()}
-                            </span>
+                <div ref={iconRef} className={plateClass}>
+                    {showGlassPlate && <div className="glass-refraction" />}
+                    {isLetterIcon ? (
+                        <div
+                            className={letterTileClassName(letterBg, 'flex items-center justify-center overflow-hidden rounded-xl')}
+                            style={letterTileStyle(letterBg, LETTER_TILE_BOX_STYLE)}
+                        >
+                            <LetterIconGlyph text={letter} />
                         </div>
                     ) : (
                         iconSrc ? (
@@ -101,7 +113,7 @@ const SortableFolderItem = ({ shortcut, onRemove, onEdit, isContextOpen, setCont
                                 draggable={false}
                             />
                         ) : (
-                            <div className="w-full h-full bg-white/5 animate-pulse" />
+                            <div className={`w-full h-full animate-pulse ${showIconBackground ? 'bg-white/5' : 'bg-white/10 rounded-full'}`} />
                         )
                     )}
                 </div>
@@ -163,7 +175,7 @@ const OutsideDroppable = ({ children, onClose, isVisible }) => {
     );
 };
 
-const FolderModal = ({ isOpen, onClose, folder, onUpdate, onDelete, onEditShortcut }) => {
+const FolderModal = ({ isOpen, onClose, folder, onUpdate, onDelete, onEditShortcut, showIconBackground = false }) => {
     const [title, setTitle] = useState('');
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [isRendered, setIsRendered] = useState(false);
@@ -281,6 +293,7 @@ const FolderModal = ({ isOpen, onClose, folder, onUpdate, onDelete, onEditShortc
                                 onEdit={onEditShortcut}
                                 isContextOpen={contextShortcutId === item.id}
                                 setContextShortcutId={setContextShortcutId}
+                                showIconBackground={showIconBackground}
                             />
                         ))}
                     </div>

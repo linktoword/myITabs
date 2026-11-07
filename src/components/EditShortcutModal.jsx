@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import IconSelector from './IconSelector';
+import { getLetterLabel } from '../utils/letterIcon';
 
 const EditShortcutModal = ({ isOpen, onClose, shortcut, onSave }) => {
     const [url, setUrl] = useState(shortcut?.url || '');
@@ -31,10 +32,17 @@ const EditShortcutModal = ({ isOpen, onClose, shortcut, onSave }) => {
             // If no icon is selected, default to letter icon to avoid unnecessary network requests
             let finalIcon = selectedIcon;
             if (!finalIcon) {
-                const firstChar = displayTitle[0] || 'A';
                 finalIcon = {
                     type: 'letter',
-                    letter: firstChar.toUpperCase()
+                    letter: getLetterLabel(null, displayTitle)
+                };
+            } else if (finalIcon.type === 'letter') {
+                finalIcon = {
+                    ...finalIcon,
+                    letter: getLetterLabel(finalIcon, displayTitle),
+                    ...(finalIcon.backgroundColor || selectedIcon?.backgroundColor
+                        ? { backgroundColor: finalIcon.backgroundColor || selectedIcon.backgroundColor }
+                        : {})
                 };
             }
 
