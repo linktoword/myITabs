@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Cloud, RefreshCw, Globe, LogOut, Github, Combine } from 'lucide-react';
+import { X, Cloud, RefreshCw, Globe, LogOut, Combine } from 'lucide-react';
 import { fetchRandomPhoto, cacheImage } from '../utils/unsplash';
 import WallpaperModal from './WallpaperModal';
 import IconSelector from './IconSelector';
@@ -106,23 +106,6 @@ const Settings = ({
                                     <h3 className="text-sm font-medium text-white mb-4">添加新快捷方式</h3>
                                     <AddShortcutForm onAddShortcut={onAddShortcut} showToast={showToast} />
                                 </div>
-
-                                <div className="pt-4 border-t border-white/10">
-                                    <h3 className="text-sm font-medium text-white mb-4">关于</h3>
-                                    <a
-                                        href="https://github.com/tenoms"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 rounded-lg transition-all border border-white/10 hover:border-white/20 group"
-                                    >
-                                        <Github className="h-5 w-5 text-white/80 group-hover:text-white transition-colors" />
-                                        <div className="flex-1">
-                                            <div className="text-sm text-white font-medium">iTabs</div>
-                                            <div className="text-xs text-white/40">View source on GitHub</div>
-                                        </div>
-                                    </a>
-                                </div>
-
                             </div>
                         )}
 
