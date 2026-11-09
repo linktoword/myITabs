@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, ChevronDown, Check } from 'lucide-react';
+import { ChevronDown, Check, Search } from 'lucide-react';
 import { loadDisplayIcon } from '../utils/icons';
+import { fetchBaiduSuggestions } from '../utils/baiduSuggest';
 
 const SEARCH_ENGINES = {
     google: {
@@ -25,6 +26,29 @@ const SEARCH_ENGINES = {
     }
 };
 
+const SUGGEST_DELAY_MS = 100;
+
+/** 两次输入仍属于同一串词时，先留着上一批联想，避免面板闪一下 */
+const isRelatedQuery = (current, previous) => {
+    if (!current || !previous) return false;
+    return current.startsWith(previous) || previous.startsWith(current);
+};
+
+/** 已输入的部分稍淡，补全部分更清楚。浅色毛玻璃上用深色字 */
+const SuggestionText = ({ text, keyword }) => {
+    const needle = keyword.trim();
+    const matched = needle && text.toLowerCase().startsWith(needle.toLowerCase());
+    if (!matched) {
+        return <span className="text-black/80">{text}</span>;
+    }
+    return (
+        <>
+            <span className="text-black/45">{text.slice(0, needle.length)}</span>
+            <span className="text-black/85">{text.slice(needle.length)}</span>
+        </>
+    );
+};
+
 const SearchBar = () => {
     const [query, setQuery] = useState('');
     const [engine, setEngine] = useState(() => {
@@ -32,7 +56,16 @@ const SearchBar = () => {
     });
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [engineIcons, setEngineIcons] = useState({});
+    const [suggestions, setSuggestions] = useState([]);
+    const [suggestionsQuery, setSuggestionsQuery] = useState('');
+    const [suggestOpen, setSuggestOpen] = useState(false);
+    const [activeIndex, setActiveIndex] = useState(-1);
     const dropdownRef = useRef(null);
+    const formRef = useRef(null);
+    const inputRef = useRef(null);
+    const listRef = useRef(null);
+    const optionRefs = useRef([]);
+    const dismissedRef = useRef(false);
 
     useEffect(() => {
         let alive = true;
@@ -63,38 +96,133 @@ const SearchBar = () => {
     }, []);
 
     useEffect(() => {
-        const handleClickOutside = (event) => {
+        const handlePointerDown = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
                 setIsDropdownOpen(false);
             }
+            if (formRef.current && !formRef.current.contains(event.target)) {
+                dismissedRef.current = true;
+                setSuggestOpen(false);
+            }
         };
 
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
+        document.addEventListener('pointerdown', handlePointerDown);
+        return () => document.removeEventListener('pointerdown', handlePointerDown);
     }, []);
 
-    const handleSearch = (e) => {
-        e.preventDefault();
-        if (query.trim()) {
-            const searchUrl = SEARCH_ENGINES[engine].url + encodeURIComponent(query);
-            window.location.href = searchUrl;
+    useEffect(() => {
+        const keyword = query.trim();
+        if (!keyword) {
+            dismissedRef.current = false;
+            return undefined;
         }
+
+        dismissedRef.current = false;
+        const controller = new AbortController();
+        const timer = setTimeout(async () => {
+            try {
+                const list = await fetchBaiduSuggestions(keyword, controller.signal);
+                if (controller.signal.aborted) return;
+                setSuggestions(list);
+                setSuggestionsQuery(keyword);
+                setActiveIndex(-1);
+                const inputFocused = document.activeElement === inputRef.current;
+                setSuggestOpen(inputFocused && !dismissedRef.current && list.length > 0);
+            } catch (error) {
+                if (error?.name === 'AbortError') return;
+                setSuggestions([]);
+                setSuggestOpen(false);
+            }
+        }, SUGGEST_DELAY_MS);
+
+        return () => {
+            clearTimeout(timer);
+            controller.abort();
+        };
+    }, [query]);
+
+    useEffect(() => {
+        const option = optionRefs.current[activeIndex];
+        const list = listRef.current;
+        if (!option || !list || activeIndex < 0) return;
+        const top = option.offsetTop;
+        const bottom = top + option.offsetHeight;
+        if (top < list.scrollTop) {
+            list.scrollTop = top;
+        } else if (bottom > list.scrollTop + list.clientHeight) {
+            list.scrollTop = bottom - list.clientHeight;
+        }
+    }, [activeIndex]);
+
+    const keyword = query.trim();
+    const showSuggestions = suggestOpen
+        && suggestions.length > 0
+        && isRelatedQuery(keyword.toLowerCase(), suggestionsQuery.trim().toLowerCase());
+
+    const goSearch = (text) => {
+        const nextQuery = text.trim();
+        if (!nextQuery) return;
+        const searchUrl = SEARCH_ENGINES[engine].url + encodeURIComponent(nextQuery);
+        window.location.href = searchUrl;
+    };
+
+    const handleSearch = (event) => {
+        event.preventDefault();
+        goSearch(query);
     };
 
     const handleEngineSelect = (engineKey) => {
         setEngine(engineKey);
         localStorage.setItem('default_search_engine', engineKey);
         setIsDropdownOpen(false);
+        inputRef.current?.focus();
+    };
+
+    const handleKeyDown = (event) => {
+        if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+
+        if (event.key === 'ArrowDown') {
+            if (!suggestions.length || !isRelatedQuery(keyword.toLowerCase(), suggestionsQuery.trim().toLowerCase())) return;
+            event.preventDefault();
+            dismissedRef.current = false;
+            setSuggestOpen(true);
+            setActiveIndex((index) => Math.min(index + 1, suggestions.length - 1));
+            return;
+        }
+
+        if (event.key === 'ArrowUp') {
+            if (!showSuggestions) return;
+            event.preventDefault();
+            setActiveIndex((index) => Math.max(index - 1, -1));
+            return;
+        }
+
+        if (event.key === 'Escape' && showSuggestions) {
+            event.preventDefault();
+            dismissedRef.current = true;
+            setSuggestOpen(false);
+            setActiveIndex(-1);
+            return;
+        }
+
+        if (event.key === 'Enter' && showSuggestions && activeIndex >= 0) {
+            event.preventDefault();
+            goSearch(suggestions[activeIndex]);
+        }
     };
 
     return (
-        <form onSubmit={handleSearch} className="w-full max-w-2xl mb-4 relative z-30">
+        <form ref={formRef} onSubmit={handleSearch} className="w-full max-w-2xl mb-4 relative z-30">
             <div className="relative group flex items-center">
                 {/* Search Engine Selector */}
                 <div className="absolute left-2 z-40" ref={dropdownRef}>
                     <button
                         type="button"
-                        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                        onClick={() => {
+                            setIsDropdownOpen(!isDropdownOpen);
+                            dismissedRef.current = true;
+                            setSuggestOpen(false);
+                        }}
                         className="flex items-center gap-2 p-2 rounded-full hover:bg-white/10 transition-colors"
                     >
                         {engineIcons[engine] && (
@@ -135,9 +263,33 @@ const SearchBar = () => {
                 </div>
 
                 <input
+                    ref={inputRef}
                     type="text"
+                    role="combobox"
+                    aria-expanded={showSuggestions}
+                    aria-controls="search-suggestions"
+                    aria-autocomplete="list"
+                    aria-activedescendant={showSuggestions && activeIndex >= 0 ? `search-suggestion-${activeIndex}` : undefined}
+                    autoComplete="off"
+                    spellCheck={false}
                     value={query}
-                    onChange={(e) => setQuery(e.target.value)}
+                    onChange={(event) => {
+                        const nextQuery = event.target.value;
+                        setQuery(nextQuery);
+                        if (!nextQuery.trim()) {
+                            setSuggestions([]);
+                            setSuggestionsQuery('');
+                            setSuggestOpen(false);
+                            setActiveIndex(-1);
+                        }
+                    }}
+                    onKeyDown={handleKeyDown}
+                    onFocus={() => {
+                        if (suggestions.length && isRelatedQuery(keyword.toLowerCase(), suggestionsQuery.trim().toLowerCase())) {
+                            dismissedRef.current = false;
+                            setSuggestOpen(true);
+                        }
+                    }}
                     className="block w-full pl-20 pr-4 py-2 bg-black/20 hover:bg-black/30 
                      border border-white/10 rounded-full 
                      text-white placeholder-white/70 focus:outline-none focus:bg-black/40 
@@ -146,6 +298,40 @@ const SearchBar = () => {
                     placeholder={`Search ${SEARCH_ENGINES[engine].name}...`}
                 />
             </div>
+
+            {showSuggestions && (
+                <div className="suggest-panel absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-[18px]">
+                    <div
+                        id="search-suggestions"
+                        ref={listRef}
+                        role="listbox"
+                        className="suggest-list max-h-[min(360px,calc(70vh-48px))] overflow-y-auto py-1.5"
+                    >
+                        {suggestions.map((text, index) => (
+                            <button
+                                key={text}
+                                id={`search-suggestion-${index}`}
+                                ref={(node) => {
+                                    optionRefs.current[index] = node;
+                                }}
+                                type="button"
+                                role="option"
+                                aria-selected={index === activeIndex}
+                                onMouseDown={(event) => event.preventDefault()}
+                                onMouseEnter={() => setActiveIndex(index)}
+                                onMouseLeave={() => setActiveIndex((current) => (current === index ? -1 : current))}
+                                onClick={() => goSearch(text)}
+                                className={`flex w-full cursor-pointer items-center gap-2.5 px-4 py-1.5 text-left text-sm leading-5 tracking-normal transition-colors duration-150 active:bg-black/[0.06] ${index === activeIndex ? 'bg-black/[0.04]' : ''}`}
+                            >
+                                <Search className="h-3.5 w-3.5 shrink-0 text-black/40" />
+                                <span className="truncate">
+                                    <SuggestionText text={text} keyword={keyword} />
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
         </form>
     );
 };

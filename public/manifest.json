@@ -24,6 +24,7 @@
         "https://api.unsplash.com/*",
         "https://*.workers.dev/*",
         "https://www.google.com/s2/*",
-        "https://*.gstatic.com/faviconV2*"
+        "https://*.gstatic.com/faviconV2*",
+        "https://www.baidu.com/sugrec*"
     ]
 }
