@@ -20,7 +20,7 @@ const DEFAULT_BG_URL = 'https://images.unsplash.com/photo-1472214103451-9374bd1c
 const DEFAULT_GRID_CONFIG = {
   cols: 8,
   rows: 4,
-  iconSize: 80,
+  iconSize: 62,
   showSearchBar: true,
   showIconBackground: false,
 };
@@ -257,7 +257,7 @@ function App() {
   };
 
   const handleEditShortcut = (updatedShortcut) => {
-    const newShortcuts = shortcuts.map(s => 
+    const newShortcuts = shortcuts.map(s =>
       s.id === updatedShortcut.id ? updatedShortcut : s
     );
     setShortcuts(newShortcuts);
@@ -465,7 +465,7 @@ function App() {
     // 合并笔记，避免重复
     const existingIds = new Set(notes.map(n => n.id));
     const newNotes = importedNotes.filter(note => !existingIds.has(note.id));
-    
+
     if (newNotes.length === 0) {
       setToast({ message: '没有新的笔记需要导入', type: 'error' });
       return 0;
@@ -509,7 +509,7 @@ function App() {
     }
 
     // 验证数据格式：至少包含一个有效字段
-    const hasValidData = 
+    const hasValidData =
       (data.todos && Array.isArray(data.todos)) ||
       (data.notes && Array.isArray(data.notes)) ||
       (data.shortcuts && Array.isArray(data.shortcuts)) ||
@@ -602,7 +602,7 @@ function App() {
           title="笔记"
         >
           <StickyNote className="h-5 w-5" />
-        </button>        
+        </button>
         <button
           onClick={handleTodoDockClick}
           className="w-12 h-12 rounded-xl liquid-glass-mini hover:scale-110 hover:border-white/40 text-white flex items-center justify-center transition-all active:scale-95"
@@ -616,15 +616,15 @@ function App() {
           title="通用"
         >
           <SettingsIcon className="h-5 w-5" />
-        </button>        
+        </button>
         <button
           onClick={() => setSettingsTrigger({ tab: 'sync', at: Date.now() })}
           className="w-12 h-12 rounded-xl liquid-glass-mini hover:scale-110 hover:border-white/40 flex items-center justify-center transition-all active:scale-95"
           title="同步"
         >
           <Cloud className={`h-5 w-5 transition-colors ${
-            !isLoggedIn ? 'text-white' : 
-            !isOnline ? 'text-red-400' : 
+            !isLoggedIn ? 'text-white' :
+            !isOnline ? 'text-red-400' :
             'text-green-400'
           }`} />
         </button>
@@ -676,7 +676,7 @@ function App() {
             <div
               style={{
                 width: 'clamp(260px, 75vw, 720px)',
-                maxWidth: isTodoVisible 
+                maxWidth: isTodoVisible
                   ? (gridConfig.centerSearchBar ? 'calc(100vw - 640px)' : 'calc(100% - 320px)')
                   : '75vw',
                 transform: (gridConfig.centerSearchBar && isTodoVisible) ? 'translateX(-80px)' : 'none',

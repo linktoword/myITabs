@@ -32,10 +32,12 @@ const SortableFolderItem = ({ shortcut, onRemove, onEdit, isContextOpen, setCont
 
     const iconSrc = useIconSource(shortcut);
     const iconRef = useRef(null);
+    const [failedSrc, setFailedSrc] = useState(null);
 
     const letter = getLetterLabel(shortcut.customIcon, shortcut.title);
     const letterBg = getLetterBackgroundColor(shortcut.customIcon);
-    const isLetterIcon = shortcut.customIcon?.type === 'letter';
+    const imageFailed = Boolean(iconSrc) && failedSrc === iconSrc;
+    const isLetterIcon = shortcut.customIcon?.type === 'letter' || iconSrc === false || imageFailed;
 
     // 动态光泽效果：仅图片图标且开启「图标背景」时启用
     useEffect(() => {
@@ -111,6 +113,7 @@ const SortableFolderItem = ({ shortcut, onRemove, onEdit, isContextOpen, setCont
                                 alt={shortcut.title}
                                 className="w-4/5 h-4/5 object-contain rounded-lg"
                                 draggable={false}
+                                onError={() => setFailedSrc(iconSrc)}
                             />
                         ) : (
                             <div className={`w-full h-full animate-pulse ${showIconBackground ? 'bg-white/5' : 'bg-white/10 rounded-full'}`} />

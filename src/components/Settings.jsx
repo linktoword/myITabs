@@ -97,7 +97,7 @@ const Settings = ({
                     </div>
 
                     {/* Content */}
-                    <div 
+                    <div
                         className="flex-1 p-6 overflow-y-auto"
                         onWheel={(e) => e.stopPropagation()}
                     >
@@ -125,7 +125,7 @@ const Settings = ({
                                                 <input
                                                     type="range"
                                                     min="1"
-                                                    max="4"
+                                                    max="10"
                                                     value={gridConfig.rows}
                                                     onChange={(e) => onConfigChange({ rows: Number(e.target.value) })}
                                                     className="w-full accent-white/80 h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer"
@@ -141,7 +141,7 @@ const Settings = ({
                                                 <input
                                                     type="range"
                                                     min="3"
-                                                    max="8"
+                                                    max="20"
                                                     value={gridConfig.cols}
                                                     onChange={(e) => onConfigChange({ cols: Number(e.target.value) })}
                                                     className="w-full accent-white/80 h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer"
@@ -416,7 +416,7 @@ const AddShortcutForm = ({ onAddShortcut, showToast }) => {
         try {
             const domain = new URL(finalUrl).hostname;
             const displayTitle = capitalize(formTitle) || title || deriveTitleFromUrl(urlInput) || capitalize(domain);
-            
+
             // If no icon is selected, default to letter icon (up to 4 chars)
             let finalIcon = selectedIcon;
             if (!finalIcon) {
@@ -535,7 +535,7 @@ const LoginForm = ({ onLogin, showToast, onSyncPull }) => {
             const localShortcuts = JSON.parse(localStorage.getItem('shortcuts') || '[]');
             const cloudShortcuts = cloudData.shortcuts || [];
             const shortcutMap = new Map();
-            
+
             // Add cloud shortcuts first (priority)
             cloudShortcuts.forEach(s => shortcutMap.set(s.url, s));
             // Add local shortcuts if URL doesn't exist
@@ -550,7 +550,7 @@ const LoginForm = ({ onLogin, showToast, onSyncPull }) => {
             const localTodos = JSON.parse(localStorage.getItem('todos') || '[]');
             const cloudTodos = cloudData.todos || [];
             const todoMap = new Map();
-            
+
             [...localTodos, ...cloudTodos].forEach(todo => {
                 const existing = todoMap.get(todo.id);
                 if (!existing || new Date(todo.updatedAt || 0) > new Date(existing.updatedAt || 0)) {
@@ -563,7 +563,7 @@ const LoginForm = ({ onLogin, showToast, onSyncPull }) => {
             const localNotes = JSON.parse(localStorage.getItem('notes') || '[]');
             const cloudNotes = cloudData.notes || [];
             const noteMap = new Map();
-            
+
             [...localNotes, ...cloudNotes].forEach(note => {
                 const existing = noteMap.get(note.id);
                 if (!existing || new Date(note.updatedAt || 0) > new Date(existing.updatedAt || 0)) {
@@ -593,14 +593,14 @@ const LoginForm = ({ onLogin, showToast, onSyncPull }) => {
 
             // Push merged data to cloud immediately
             await syncService.pushData(mergedData);
-            
+
             showToast('数据合并成功！', 'success');
-            
+
             // Reload to apply changes
             setTimeout(() => {
                 window.location.reload();
             }, 500);
-            
+
             return true;
         } catch (error) {
             showToast('合并数据失败: ' + error.message, 'error');
@@ -629,11 +629,11 @@ const LoginForm = ({ onLogin, showToast, onSyncPull }) => {
                     bgConfig: JSON.parse(localStorage.getItem('bg_config') || '{}'),
                     bgUrl: localStorage.getItem('bg_url') || ''
                 };
-                
+
                 await syncService.pushData(localData);
                 localStorage.setItem('last_local_update', String(Date.now()));
                 showToast('本地数据已上传到云端', 'success');
-                
+
                 setShowDataConflict(false);
                 if (pendingLoginEmail) {
                     onLogin(pendingLoginEmail);
@@ -662,7 +662,7 @@ const LoginForm = ({ onLogin, showToast, onSyncPull }) => {
         try {
             // Save worker URL before login/register
             syncService.setWorkerUrl(workerUrl);
-            
+
             if (isRegistering) {
                 await syncService.register(email, password);
                 showToast('账户创建成功！', 'success');
@@ -671,7 +671,7 @@ const LoginForm = ({ onLogin, showToast, onSyncPull }) => {
                 return;
             } else {
                 await syncService.login(email, password);
-                
+
                 // Check if there's local data and cloud data
                 if (hasLocalData()) {
                     const cloudData = await syncService.pullData();
@@ -704,7 +704,7 @@ const LoginForm = ({ onLogin, showToast, onSyncPull }) => {
         return (
             <div>
                 <h3 className="text-sm font-medium text-white mb-4">数据冲突</h3>
-                
+
                 <div className="space-y-4">
                     <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
                         <p className="text-sm text-white/90 leading-relaxed">
@@ -805,7 +805,7 @@ const LoginForm = ({ onLogin, showToast, onSyncPull }) => {
                     >
                         {showAdvanced ? '隐藏' : '显示'}高级设置
                     </button>
-                    
+
                     {showAdvanced && (
                         <div className="mt-3 space-y-2">
                             <label className="text-xs text-white/60">服务器地址</label>

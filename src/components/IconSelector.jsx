@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Upload, Check } from 'lucide-react';
-import { getAllIconUrls } from '../utils/icons';
+import { getAllIconUrls, isIconUrlUsable } from '../utils/icons';
 import { LETTER_COLOR_PICKER_DEFAULT, getLetterLabel, letterTileClassName, letterTileStyle } from '../utils/letterIcon';
 import LetterIconGlyph from './LetterIconGlyph';
 
@@ -74,14 +74,10 @@ const IconSelector = ({ url, title, onSelect, selectedIcon }) => {
             
             // Then load and validate other icons (without crossOrigin to avoid CORS preflight)
             const icons = getAllIconUrls(currentUrl);
-            const validated = await Promise.all(icons.map((icon) => new Promise((resolve) => {
-                const img = new Image();
-                // Don't set crossOrigin - this avoids CORS preflight checks
-                // Some icons may fail silently, which is acceptable
-                img.onload = () => resolve(icon);
-                img.onerror = () => resolve(null); // Silently fail
-                img.src = icon.url;
-            })));
+            const validated = await Promise.all(icons.map(async (icon) => {
+                const usable = await isIconUrlUsable(icon.url);
+                return usable ? icon : null;
+            }));
 
             const filtered = [...baseList, ...validated.filter(Boolean)];
             if (!abort && currentUrl === url) {

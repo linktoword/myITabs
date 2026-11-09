@@ -1,16 +1,19 @@
 import { useIconSource } from '../hooks/useIconSource';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getLetterBackgroundColor, getLetterLabel, letterTileClassName, letterTileStyle } from '../utils/letterIcon';
 import LetterIconGlyph from './LetterIconGlyph';
 
 const MiniIcon = ({ item }) => {
     const iconSrc = useIconSource(item);
+    const [failedSrc, setFailedSrc] = useState(null);
     const letterBg = getLetterBackgroundColor(item.customIcon);
     const letter = getLetterLabel(item.customIcon, item.title);
+    const imageFailed = Boolean(iconSrc) && failedSrc === iconSrc;
+    const showLetter = item.customIcon?.type === 'letter' || iconSrc === false || imageFailed;
 
     return (
         <div className="aspect-square rounded-md overflow-hidden liquid-glass-mini flex items-center justify-center">
-             {item.customIcon?.type === 'letter' ? (
+             {showLetter ? (
                 <div
                     className={letterTileClassName(letterBg, 'w-full h-full flex items-center justify-center overflow-hidden rounded-md')}
                     style={letterTileStyle(letterBg)}
@@ -23,11 +26,7 @@ const MiniIcon = ({ item }) => {
                         src={iconSrc} 
                         alt="" 
                         className="w-full h-full object-cover rounded-md"
-                        onError={(e) => {
-                            if (!e.target.parentElement) return;
-                            e.target.style.display = 'none';
-                            e.target.parentElement.classList.add('bg-gradient-to-br', 'from-blue-500', 'to-purple-600');
-                        }}
+                        onError={() => setFailedSrc(iconSrc)}
                     />
                 ) : (
                     <div className="w-full h-full bg-white/5 animate-pulse" />

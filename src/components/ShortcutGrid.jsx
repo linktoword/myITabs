@@ -4,7 +4,7 @@ import { useIconSource } from '../hooks/useIconSource';
 import EditShortcutModal from './EditShortcutModal';
 import FolderIcon from './FolderIcon';
 import FolderModal from './FolderModal';
-import { getLetterBackgroundColor, getLetterLabel, letterTileClassName, letterTileStyle, letterFallbackHtml, LETTER_TILE_BOX_STYLE } from '../utils/letterIcon';
+import { getLetterBackgroundColor, getLetterLabel, letterTileClassName, letterTileStyle, LETTER_TILE_BOX_STYLE } from '../utils/letterIcon';
 import LetterIconGlyph from './LetterIconGlyph';
 import {
     DndContext,
@@ -42,9 +42,11 @@ const createFolderId = () => `folder-${Date.now()}`;
 const WebsiteShortcutIcon = ({ shortcut, iconSize, isContextOpen, onRemove, onEdit, setContextShortcutId, showIconBackground = false }) => {
     const iconSrc = useIconSource(shortcut);
     const iconRef = useRef(null);
+    const [failedSrc, setFailedSrc] = useState(null);
     const letter = getLetterLabel(shortcut.customIcon, shortcut.title);
     const letterBg = getLetterBackgroundColor(shortcut.customIcon);
-    const isLetterIcon = shortcut.customIcon?.type === 'letter' || iconSrc === false;
+    const imageFailed = Boolean(iconSrc) && failedSrc === iconSrc;
+    const isLetterIcon = shortcut.customIcon?.type === 'letter' || iconSrc === false || imageFailed;
 
     // 动态光泽效果：字母图标始终有色块，不需要玻璃板光泽；图片图标仅在开启「图标背景」时启用
     useEffect(() => {
@@ -69,8 +71,6 @@ const WebsiteShortcutIcon = ({ shortcut, iconSize, isContextOpen, onRemove, onEd
     const plateClass = showGlassPlate
         ? 'rounded-[22px] liquid-glass-icon flex items-center justify-center overflow-hidden h-full w-full'
         : 'rounded-[22px] flex items-center justify-center overflow-hidden h-full w-full bg-transparent';
-
-    const fallbackHtml = letterFallbackHtml(letter, letterBg);
 
     return (
         <div
@@ -103,11 +103,7 @@ const WebsiteShortcutIcon = ({ shortcut, iconSize, isContextOpen, onRemove, onEd
                                 objectFit: 'contain',
                             }}
                             draggable={false}
-                            onError={(e) => {
-                                if (!e.target.parentElement) return;
-                                e.target.style.display = 'none';
-                                e.target.parentElement.innerHTML = fallbackHtml;
-                            }}
+                            onError={() => setFailedSrc(iconSrc)}
                         />
                     ) : (
                         <div className={`w-full h-full animate-pulse ${showIconBackground ? 'bg-gray-50' : 'bg-white/10 rounded-full'}`} />

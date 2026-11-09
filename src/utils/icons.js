@@ -38,6 +38,112 @@ export const getAllIconUrls = (url) => {
     ];
 };
 
+/** Google Favicon 404 仍返回占位图，只能靠状态码判断 */
+const isGoogleFaviconUrl = (iconUrl) => {
+    try {
+        const parsed = new URL(iconUrl);
+        if (parsed.protocol !== 'https:') return false;
+        if (parsed.hostname === 'www.google.com') {
+            return parsed.pathname.startsWith('/s2/favicons');
+        }
+        return parsed.hostname.endsWith('.gstatic.com') && parsed.pathname.startsWith('/faviconV2');
+    } catch {
+        return false;
+    }
+};
+
+const probeImageLoad = (iconUrl) => new Promise((resolve) => {
+    const img = new Image();
+    const timer = setTimeout(() => resolve(false), 8000);
+    img.onload = () => {
+        clearTimeout(timer);
+        resolve(img.naturalWidth > 0 && img.naturalHeight > 0);
+    };
+    img.onerror = () => {
+        clearTimeout(timer);
+        resolve(false);
+    };
+    img.src = iconUrl;
+});
+
+/** 读取图标响应。开发环境通过本地代理拿到 Google 的真实状态码 */
+const requestIcon = async (iconUrl) => {
+    if (!iconUrl || iconUrl.startsWith('data:') || iconUrl.startsWith('blob:')) return null;
+    try {
+        return await fetch(iconUrl);
+    } catch {
+        if (import.meta.env.DEV && isGoogleFaviconUrl(iconUrl)) {
+            try {
+                return await fetch(`/api/favicon-proxy?url=${encodeURIComponent(iconUrl)}`);
+            } catch {
+                return null;
+            }
+        }
+        return null;
+    }
+};
+
+const isClientError = (status) => status === 404 || (status >= 400 && status < 500);
+
+/**
+ * 图标能否显示。Google 返回 404 时为 false，界面应改用字母图标。
+ */
+export const isIconUrlUsable = async (iconUrl) => {
+    if (!iconUrl) return false;
+    if (iconUrl.startsWith('data:') || iconUrl.startsWith('blob:')) return true;
+    const response = await requestIcon(iconUrl);
+    if (response) {
+        if (response.ok) return true;
+        if (isClientError(response.status)) return false;
+    }
+    return probeImageLoad(iconUrl);
+};
+
+/**
+ * 得到可显示的图标地址。确认 404 时返回 false。
+ * @returns {Promise<string|false>}
+ */
+export const loadDisplayIcon = async (iconUrl, cache) => {
+    if (!iconUrl) return false;
+    if (iconUrl.startsWith('data:') || iconUrl.startsWith('blob:')) return iconUrl;
+
+    if (cache) {
+        try {
+            const cached = await cache.match(iconUrl);
+            if (cached?.ok && cached.type !== 'opaque') {
+                const blob = await cached.blob();
+                if (blob.size > 0) return URL.createObjectURL(blob);
+            }
+        } catch {
+            // 缓存不可用时继续请求网络
+        }
+    }
+
+    const response = await requestIcon(iconUrl);
+    if (response) {
+        if (isClientError(response.status)) return false;
+        if (response.ok) {
+            try {
+                const copy = response.clone();
+                const blob = await response.blob();
+                if (!blob.size || (blob.type && !blob.type.startsWith('image/'))) return false;
+                if (cache) {
+                    try {
+                        await cache.put(iconUrl, copy);
+                    } catch {
+                        // 缓存失败不影响本次显示
+                    }
+                }
+                return URL.createObjectURL(blob);
+            } catch {
+                return false;
+            }
+        }
+    }
+
+    return (await probeImageLoad(iconUrl)) ? iconUrl : false;
+};
+
 export const getIconSources = (url) => {
     const domain = hostnameOf(url);
     if (!domain) return null;

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getAllIconUrls, normalizeIconUrl } from '../utils/icons';
+import { getAllIconUrls, loadDisplayIcon, normalizeIconUrl } from '../utils/icons';
 
 export const useIconSource = (shortcut) => {
     const [iconSrc, setIconSrc] = useState(null);
@@ -21,80 +21,49 @@ export const useIconSource = (shortcut) => {
                 return;
             }
 
-            // 3. Network URL - If user has selected a specific icon, use it directly
+            let cache = null;
+            try {
+                cache = await caches.open('icon-cache');
+            } catch {
+                cache = null;
+            }
+
+            const showIcon = async (iconUrl) => {
+                const resolved = await loadDisplayIcon(iconUrl, cache);
+                if (!isMounted) {
+                    if (typeof resolved === 'string' && resolved.startsWith('blob:')) {
+                        URL.revokeObjectURL(resolved);
+                    }
+                    return false;
+                }
+                if (typeof resolved === 'string' && resolved.startsWith('blob:')) {
+                    blobUrl = resolved;
+                }
+                setIconSrc(resolved);
+                return resolved !== false;
+            };
+
+            // 3. 用户指定的网络图标。404 时改为字母图标
             if (shortcut.customIcon?.url) {
-                // 用户指定的图标直接使用；旧的 Clearbit 地址改写到 Google
-                if (isMounted) setIconSrc(normalizeIconUrl(shortcut.customIcon.url));
+                await showIcon(normalizeIconUrl(shortcut.customIcon.url));
                 return;
             }
 
-            // 4. Auto-detect icon from URL - Try to find a working source
+            // 4. 按网址自动取图标，404 时继续尝试下一个来源
             const candidates = getAllIconUrls(shortcut.url);
-
             if (!candidates.length) {
                 if (isMounted) setIconSrc(false);
                 return;
             }
 
             try {
-                const cache = await caches.open('icon-cache');
-
-                // First pass: Check cache for any candidate
                 for (const candidate of candidates) {
-                    try {
-                        const cachedResponse = await cache.match(candidate.url);
-                        if (cachedResponse && cachedResponse.ok && cachedResponse.type !== 'opaque') {
-                            const blob = await cachedResponse.blob();
-                            if (blob.size > 0) {
-                                blobUrl = URL.createObjectURL(blob);
-                                if (isMounted) setIconSrc(blobUrl);
-                                return;
-                            }
-                        }
-                    } catch {
-                        // Continue to next candidate
-                    }
+                    const found = await showIcon(candidate.url);
+                    if (found) return;
                 }
-                
-                // Second pass: Probe live URLs
-                for (const candidate of candidates) {
-                    try {
-                        // Probe with Image object to avoid CORS errors on 404s
-                        await new Promise((resolve, reject) => {
-                            const img = new Image();
-                            img.onload = resolve;
-                            img.onerror = reject;
-                            img.src = candidate.url;
-                        });
-
-                        // If we get here, the image exists and loaded
-                        if (isMounted) setIconSrc(candidate.url);
-                        
-                        // Try to cache it for next time
-                        try {
-                            // Skip caching for Google URLs to avoid CORS errors
-                            // Google favicons don't support CORS, so fetch/cache.add will fail
-                            if (!candidate.url.includes('google.com/s2/favicons')) {
-                                await cache.add(candidate.url);
-                            }
-                        } catch {
-                            // If CORS fails but image loaded, we just can't cache it.
-                            // This is acceptable.
-                        }
-                        return; // Found a working one
-                    } catch {
-                        // Probe failed (404 or network error), try next candidate
-                        continue;
-                    }
-                }
-
-                // If all failed
                 if (isMounted) setIconSrc(false);
-
             } catch (error) {
                 console.warn('Icon loading failed:', error);
-                // Fallback to primary URL if everything explodes, or false?
-                // Better to fail gracefully to letter
                 if (isMounted) setIconSrc(false);
             }
         };
