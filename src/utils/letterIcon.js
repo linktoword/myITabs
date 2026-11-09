@@ -2,10 +2,16 @@
 
 export const LETTER_COLOR_PICKER_DEFAULT = '#6366f1';
 
-/** Original letter tile size relative to the icon cell */
+/**
+ * 图标图形相对格子的边长。
+ * 字母色块与未开启内边距的图片图标共用，避免字母图标比图片图标小一圈。
+ */
+export const ICON_GRAPHIC_SIZE = '90%';
+
+/** 字母色块铺满图标格，与图片图标外框一致 */
 export const LETTER_TILE_BOX_STYLE = {
-    width: '80%',
-    height: '80%',
+    width: ICON_GRAPHIC_SIZE,
+    height: ICON_GRAPHIC_SIZE,
 };
 
 /** Prefer customIcon.backgroundColor; fall back to null => legacy gradient */
@@ -29,18 +35,21 @@ export function getLetterChars(label) {
     return [...(label || 'A')];
 }
 
-/** Font size (px) for a letter tile×62 tile */
+/**
+ * 字号相对色块宽度（cqw），随图标尺寸缩放。
+ * 主图标在 62px 格子里约等于原先的 28/20/15/16px。
+ */
 export function getLetterFontSize(charCount, { compact = false } = {}) {
     if (compact) {
-        if (charCount <= 1) return 10;
-        if (charCount === 2) return 8;
-        if (charCount === 3) return 6;
-        return 7; // 2x2 mini
+        if (charCount <= 1) return '72cqw';
+        if (charCount === 2) return '56cqw';
+        if (charCount === 3) return '42cqw';
+        return '40cqw';
     }
-    if (charCount <= 1) return 28;
-    if (charCount === 2) return 20;
-    if (charCount === 3) return 15;
-    return 16; // 2x2 grid
+    if (charCount <= 1) return '46cqw';
+    if (charCount === 2) return '34cqw';
+    if (charCount === 3) return '26cqw';
+    return '28cqw';
 }
 
 export function letterTileClassName(backgroundColor, extra = '') {
@@ -49,10 +58,12 @@ export function letterTileClassName(backgroundColor, extra = '') {
 }
 
 export function letterTileStyle(backgroundColor, extraStyle = {}) {
+    // cqw 字号相对这个色块计算，色块需要成为尺寸容器
+    const layout = { containerType: 'size' };
     if (backgroundColor) {
-        return { backgroundColor, ...extraStyle };
+        return { backgroundColor, ...layout, ...extraStyle };
     }
-    return { ...extraStyle };
+    return { ...layout, ...extraStyle };
 }
 
 function escapeHtml(text) {
@@ -72,16 +83,16 @@ export function letterGlyphHtml(label, { compact = false } = {}) {
 
     if (n === 4) {
         const cellStyle = 'display:flex;align-items:center;justify-content:center;line-height:1;';
-        return `<div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;width:100%;height:100%;padding:4px;box-sizing:border-box;gap:0;">${safe.map((c) => `<span style="${cellStyle}font-size:${fontSize}px;font-weight:700;color:#fff;">${c}</span>`).join('')}</div>`;
+        return `<div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;width:100%;height:100%;padding:6%;box-sizing:border-box;gap:0;">${safe.map((c) => `<span style="${cellStyle}font-size:${fontSize};font-weight:700;color:#fff;">${c}</span>`).join('')}</div>`;
     }
 
-    return `<span style="font-size:${fontSize}px;font-weight:700;color:#fff;line-height:1;letter-spacing:${n > 1 ? '-0.02em' : 'normal'};white-space:nowrap;">${safe.join('')}</span>`;
+    return `<span style="font-size:${fontSize};font-weight:700;color:#fff;line-height:1;letter-spacing:${n > 1 ? '-0.02em' : 'normal'};white-space:nowrap;">${safe.join('')}</span>`;
 }
 
 /** Build inline HTML for letter tile / image onError fallback */
 export function letterFallbackHtml(letter, backgroundColor, {
     roundedClass = 'rounded-[22px]',
-    boxStyle = 'width: 80%; height: 80%;',
+    boxStyle = 'width: 100%; height: 100%; container-type: size;',
     compact = false,
 } = {}) {
     const label = getLetterLabel({ letter }, letter);

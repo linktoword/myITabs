@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Upload, Check } from 'lucide-react';
-import { getAllIconUrls, isIconUrlUsable } from '../utils/icons';
+import { getAllIconUrls, loadDisplayIcon } from '../utils/icons';
 import { LETTER_COLOR_PICKER_DEFAULT, getLetterLabel, letterTileClassName, letterTileStyle } from '../utils/letterIcon';
 import LetterIconGlyph from './LetterIconGlyph';
 
@@ -58,6 +58,7 @@ const IconSelector = ({ url, title, onSelect, selectedIcon }) => {
 
     useEffect(() => {
         let abort = false;
+        const blobUrls = [];
         const currentUrl = url;
         
         const loadIcons = async () => {
@@ -75,8 +76,16 @@ const IconSelector = ({ url, title, onSelect, selectedIcon }) => {
             // Then load and validate other icons (without crossOrigin to avoid CORS preflight)
             const icons = getAllIconUrls(currentUrl);
             const validated = await Promise.all(icons.map(async (icon) => {
-                const usable = await isIconUrlUsable(icon.url);
-                return usable ? icon : null;
+                const preview = await loadDisplayIcon(icon.url);
+                if (typeof preview === 'string' && preview.startsWith('blob:')) {
+                    if (abort) {
+                        URL.revokeObjectURL(preview);
+                    } else {
+                        blobUrls.push(preview);
+                    }
+                }
+                if (!preview) return null;
+                return { ...icon, preview };
             }));
 
             const filtered = [...baseList, ...validated.filter(Boolean)];
@@ -85,7 +94,10 @@ const IconSelector = ({ url, title, onSelect, selectedIcon }) => {
             }
         };
         loadIcons();
-        return () => { abort = true; };
+        return () => {
+            abort = true;
+            blobUrls.forEach((item) => URL.revokeObjectURL(item));
+        };
     }, [url, initialLetterIcon]);
 
     const handleIconSelect = (source, iconUrl) => {
@@ -165,7 +177,7 @@ const IconSelector = ({ url, title, onSelect, selectedIcon }) => {
                             </div>
                         ) : (
                             <img
-                                src={icon.url}
+                                src={icon.preview || icon.url}
                                 alt={icon.name}
                                 className="w-full h-full object-contain p-1"
                                 onError={(e) => {

@@ -4,7 +4,7 @@ import { useIconSource } from '../hooks/useIconSource';
 import EditShortcutModal from './EditShortcutModal';
 import FolderIcon from './FolderIcon';
 import FolderModal from './FolderModal';
-import { getLetterBackgroundColor, getLetterLabel, letterTileClassName, letterTileStyle, LETTER_TILE_BOX_STYLE } from '../utils/letterIcon';
+import { getLetterBackgroundColor, getLetterLabel, letterTileClassName, letterTileStyle, LETTER_TILE_BOX_STYLE, ICON_GRAPHIC_SIZE } from '../utils/letterIcon';
 import LetterIconGlyph from './LetterIconGlyph';
 import {
     DndContext,
@@ -98,8 +98,8 @@ const WebsiteShortcutIcon = ({ shortcut, iconSize, isContextOpen, onRemove, onEd
                             decoding="async"
                             className="select-none pointer-events-none transition-all duration-300 rounded-[18px]"
                             style={{
-                                width: shortcut.iconPadding ? '60%' : '90%',
-                                height: shortcut.iconPadding ? '60%' : '90%',
+                                width: shortcut.iconPadding ? '60%' : ICON_GRAPHIC_SIZE,
+                                height: shortcut.iconPadding ? '60%' : ICON_GRAPHIC_SIZE,
                                 objectFit: 'contain',
                             }}
                             draggable={false}

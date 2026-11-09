@@ -10,7 +10,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useIconSource } from '../hooks/useIconSource';
-import { getLetterBackgroundColor, getLetterLabel, letterTileClassName, letterTileStyle, LETTER_TILE_BOX_STYLE } from '../utils/letterIcon';
+import { getLetterBackgroundColor, getLetterLabel, letterTileClassName, letterTileStyle, LETTER_TILE_BOX_STYLE, ICON_GRAPHIC_SIZE } from '../utils/letterIcon';
 import LetterIconGlyph from './LetterIconGlyph';
 
 const SortableFolderItem = ({ shortcut, onRemove, onEdit, isContextOpen, setContextShortcutId, showIconBackground = false }) => {
@@ -111,7 +111,8 @@ const SortableFolderItem = ({ shortcut, onRemove, onEdit, isContextOpen, setCont
                             <img
                                 src={iconSrc}
                                 alt={shortcut.title}
-                                className="w-4/5 h-4/5 object-contain rounded-lg"
+                                className="object-contain rounded-lg"
+                                style={{ width: ICON_GRAPHIC_SIZE, height: ICON_GRAPHIC_SIZE }}
                                 draggable={false}
                                 onError={() => setFailedSrc(iconSrc)}
                             />

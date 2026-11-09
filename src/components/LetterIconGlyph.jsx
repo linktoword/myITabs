@@ -13,7 +13,7 @@ const LetterIconGlyph = ({ text, compact = false }) => {
         return (
             <div
                 className="grid grid-cols-2 grid-rows-2 w-full h-full box-border select-none"
-                style={{ padding: compact ? 1 : 4, gap: 0 }}
+                style={{ padding: compact ? '4%' : '6%', gap: 0 }}
             >
                 {chars.map((ch, i) => (
                     <span

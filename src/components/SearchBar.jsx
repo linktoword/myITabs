@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, ChevronDown, Check } from 'lucide-react';
+import { loadDisplayIcon } from '../utils/icons';
 
 const SEARCH_ENGINES = {
     google: {
@@ -30,7 +31,36 @@ const SearchBar = () => {
         return localStorage.getItem('default_search_engine') || 'google';
     });
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [engineIcons, setEngineIcons] = useState({});
     const dropdownRef = useRef(null);
+
+    useEffect(() => {
+        let alive = true;
+        const blobUrls = [];
+
+        const loadEngineIcons = async () => {
+            const entries = await Promise.all(Object.entries(SEARCH_ENGINES).map(async ([key, data]) => {
+                const src = await loadDisplayIcon(data.icon);
+                return [key, src || data.icon];
+            }));
+            if (!alive) {
+                entries.forEach(([, src]) => {
+                    if (typeof src === 'string' && src.startsWith('blob:')) URL.revokeObjectURL(src);
+                });
+                return;
+            }
+            entries.forEach(([, src]) => {
+                if (typeof src === 'string' && src.startsWith('blob:')) blobUrls.push(src);
+            });
+            setEngineIcons(Object.fromEntries(entries));
+        };
+
+        loadEngineIcons();
+        return () => {
+            alive = false;
+            blobUrls.forEach((item) => URL.revokeObjectURL(item));
+        };
+    }, []);
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -67,11 +97,13 @@ const SearchBar = () => {
                         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                         className="flex items-center gap-2 p-2 rounded-full hover:bg-white/10 transition-colors"
                     >
-                        <img
-                            src={SEARCH_ENGINES[engine].icon}
-                            alt={SEARCH_ENGINES[engine].name}
-                            className="w-6 h-6 rounded-full shadow-sm"
-                        />
+                        {engineIcons[engine] && (
+                            <img
+                                src={engineIcons[engine]}
+                                alt={SEARCH_ENGINES[engine].name}
+                                className="w-6 h-6 rounded-full shadow-sm"
+                            />
+                        )}
                         <ChevronDown className="w-3 h-3 text-white/50" />
                     </button>
 
@@ -85,11 +117,13 @@ const SearchBar = () => {
                                     onClick={() => handleEngineSelect(key)}
                                     className="w-full px-4 py-3 flex items-center gap-3 hover:bg-white/10 transition-colors text-left"
                                 >
-                                    <img
-                                        src={data.icon}
-                                        alt={data.name}
-                                        className="w-5 h-5 rounded-full"
-                                    />
+                                    {engineIcons[key] && (
+                                        <img
+                                            src={engineIcons[key]}
+                                            alt={data.name}
+                                            className="w-5 h-5 rounded-full"
+                                        />
+                                    )}
                                     <span className="flex-1 text-sm text-white font-medium">{data.name}</span>
                                     {engine === key && (
                                         <Check className="w-4 h-4 text-blue-400" />
