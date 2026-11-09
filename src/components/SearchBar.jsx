@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Check, Search } from 'lucide-react';
 import { loadDisplayIcon } from '../utils/icons';
 import { fetchBaiduSuggestions } from '../utils/baiduSuggest';
+import { openInNewTab } from '../utils/openUrl';
 
 const SEARCH_ENGINES = {
     google: {
@@ -60,6 +61,7 @@ const SearchBar = () => {
     const [suggestionsQuery, setSuggestionsQuery] = useState('');
     const [suggestOpen, setSuggestOpen] = useState(false);
     const [activeIndex, setActiveIndex] = useState(-1);
+    const [isComposing, setIsComposing] = useState(false);
     const dropdownRef = useRef(null);
     const formRef = useRef(null);
     const inputRef = useRef(null);
@@ -111,6 +113,8 @@ const SearchBar = () => {
     }, []);
 
     useEffect(() => {
+        if (isComposing) return undefined;
+
         const keyword = query.trim();
         if (!keyword) {
             dismissedRef.current = false;
@@ -139,7 +143,7 @@ const SearchBar = () => {
             clearTimeout(timer);
             controller.abort();
         };
-    }, [query]);
+    }, [query, isComposing]);
 
     useEffect(() => {
         const option = optionRefs.current[activeIndex];
@@ -155,15 +159,14 @@ const SearchBar = () => {
     }, [activeIndex]);
 
     const keyword = query.trim();
-    const showSuggestions = suggestOpen
-        && suggestions.length > 0
-        && isRelatedQuery(keyword.toLowerCase(), suggestionsQuery.trim().toLowerCase());
+    // 列表已经打开时，继续输入或打拼音都先留着，等新结果回来再替换
+    const showSuggestions = suggestOpen && suggestions.length > 0 && (isComposing || Boolean(keyword));
 
     const goSearch = (text) => {
         const nextQuery = text.trim();
         if (!nextQuery) return;
         const searchUrl = SEARCH_ENGINES[engine].url + encodeURIComponent(nextQuery);
-        window.location.href = searchUrl;
+        openInNewTab(searchUrl);
     };
 
     const handleSearch = (event) => {
@@ -179,10 +182,10 @@ const SearchBar = () => {
     };
 
     const handleKeyDown = (event) => {
-        if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+        if (isComposing || event.nativeEvent.isComposing || event.keyCode === 229) return;
 
         if (event.key === 'ArrowDown') {
-            if (!suggestions.length || !isRelatedQuery(keyword.toLowerCase(), suggestionsQuery.trim().toLowerCase())) return;
+            if (!suggestions.length) return;
             event.preventDefault();
             dismissedRef.current = false;
             setSuggestOpen(true);
@@ -273,9 +276,22 @@ const SearchBar = () => {
                     autoComplete="off"
                     spellCheck={false}
                     value={query}
+                    onCompositionStart={() => setIsComposing(true)}
+                    onCompositionEnd={(event) => {
+                        setIsComposing(false);
+                        const nextQuery = event.target.value;
+                        setQuery(nextQuery);
+                        if (!nextQuery.trim()) {
+                            setSuggestions([]);
+                            setSuggestionsQuery('');
+                            setSuggestOpen(false);
+                            setActiveIndex(-1);
+                        }
+                    }}
                     onChange={(event) => {
                         const nextQuery = event.target.value;
                         setQuery(nextQuery);
+                        if (isComposing || event.nativeEvent.isComposing) return;
                         if (!nextQuery.trim()) {
                             setSuggestions([]);
                             setSuggestionsQuery('');
