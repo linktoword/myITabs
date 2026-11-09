@@ -6,6 +6,9 @@ import FolderIcon from './FolderIcon';
 import FolderModal from './FolderModal';
 import { getLetterBackgroundColor, getLetterLabel, letterTileClassName, letterTileStyle, LETTER_TILE_BOX_STYLE, ICON_GRAPHIC_SIZE } from '../utils/letterIcon';
 import LetterIconGlyph from './LetterIconGlyph';
+import { arrangeGrid, findNearestSlot, samePlacement } from '../widgets/layout';
+import { getWidgetDefinition } from '../widgets/registry';
+import { removeWidget, setWidgetPlacement } from '../widgets/storage';
 import {
     DndContext,
     closestCenter,
@@ -15,6 +18,7 @@ import {
     useSensor,
     useSensors,
     DragOverlay,
+    useDraggable,
 } from '@dnd-kit/core';
 import {
     arrayMove,
@@ -164,6 +168,8 @@ const SortableShortcutItem = ({
     onOpenFolder,
     isMergeTarget,
     showIconBackground = false,
+    gridColumn,
+    gridRow,
 }) => {
     const {
         attributes,
@@ -185,7 +191,14 @@ const SortableShortcutItem = ({
         <div
             data-shortcut-id={shortcut.id}
             ref={setNodeRef}
-            style={{ ...style, width: `${Math.max(iconSize + 40, 120)}px` }}
+            style={{
+            ...style,
+            width: `${Math.max(iconSize + 40, 120)}px`,
+            gridColumn,
+            gridRow,
+            justifySelf: 'center',
+            alignSelf: 'start',
+        }}
             {...attributes}
             {...listeners}
             className="group relative flex flex-col items-center gap-3 transition-all duration-300 hover:scale-105 hover:z-10 justify-self-center h-fit touch-none cursor-pointer"
@@ -239,13 +252,61 @@ const SortableShortcutItem = ({
     );
 };
 
-const ShortcutGrid = ({ config, shortcuts, onRemoveShortcut, onEditShortcut, onReorder, leftOffset = 0 }) => {
+const widgetDragId = (instanceId) => `widget:${instanceId}`;
+
+const parseWidgetDragId = (id) => {
+    const text = String(id ?? '');
+    return text.startsWith('widget:') ? text.slice('widget:'.length) : null;
+};
+
+const GridWidget = ({ placed, onOpen, onRemove }) => {
+    const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+        id: widgetDragId(placed.widget.instanceId),
+    });
+    const Card = placed.definition.Card;
+
+    return (
+        <div
+            ref={setNodeRef}
+            className="h-full min-h-0 min-w-0 touch-none cursor-grab active:cursor-grabbing"
+            data-widget-id={placed.widget.instanceId}
+            {...attributes}
+            {...listeners}
+            style={{
+                gridColumn: `${placed.placement.col + 1} / span ${placed.span.cols}`,
+                gridRow: `${placed.placement.row + 1} / span ${placed.span.rows}`,
+                alignSelf: 'stretch',
+                opacity: isDragging ? 0.35 : 1,
+                zIndex: isDragging ? 30 : 1,
+            }}
+        >
+            <Card
+                instance={placed.widget}
+                onOpen={() => onOpen?.(placed.widget.instanceId)}
+                onRemove={() => onRemove?.(placed.widget.instanceId)}
+            />
+        </div>
+    );
+};
+
+const ShortcutGrid = ({
+    config,
+    shortcuts,
+    widgets = [],
+    onRemoveShortcut,
+    onEditShortcut,
+    onReorder,
+    onWidgetsChange,
+    onOpenWidget,
+    leftOffset = 0,
+}) => {
     const { cols = 5, rows = 3, iconSize = 96, showIconBackground = false } = config || {};
     const [currentPage, setCurrentPage] = useState(0);
     const [contextShortcutId, setContextShortcutId] = useState(null);
     const [editingShortcut, setEditingShortcut] = useState(null);
     const [responsiveCols, setResponsiveCols] = useState(cols);
     const [activeId, setActiveId] = useState(null);
+    const [dragSize, setDragSize] = useState(null);
     const [openFolder, setOpenFolder] = useState(null);
     const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
     const [mergeTargetId, setMergeTargetId] = useState(null);
@@ -256,6 +317,7 @@ const ShortcutGrid = ({ config, shortcuts, onRemoveShortcut, onEditShortcut, onR
     const lastCollisionTypeRef = useRef(null);
 
     const containerRef = useRef(null);
+    const pageGridRefs = useRef([]);
     const accumulatedRef = useRef(0);
     const lastTimeRef = useRef(0);
     const isChangingRef = useRef(false);
@@ -307,10 +369,28 @@ const ShortcutGrid = ({ config, shortcuts, onRemoveShortcut, onEditShortcut, onR
 
     const handleDragStart = (event) => {
         setActiveId(event.active.id);
+        const widgetId = parseWidgetDragId(event.active.id);
+        if (widgetId) {
+            const node = document.querySelector(`[data-widget-id="${widgetId}"]`);
+            const rect = node?.getBoundingClientRect();
+            setDragSize(rect ? { width: rect.width, height: rect.height } : null);
+            return;
+        }
+        const initial = event.active.rect?.current?.initial;
+        setDragSize(initial ? { width: initial.width, height: initial.height } : null);
     };
 
     const handleDragOver = (event) => {
         const { active, over } = event;
+
+        if (parseWidgetDragId(active.id) || (over && parseWidgetDragId(over.id))) {
+            if (mergeTimerRef.current) {
+                clearTimeout(mergeTimerRef.current);
+                mergeTimerRef.current = null;
+            }
+            setMergeTargetId(null);
+            return;
+        }
         
         // Handle drag out of folder
         const activeNode = findShortcut(active.id);
@@ -443,6 +523,19 @@ const ShortcutGrid = ({ config, shortcuts, onRemoveShortcut, onEditShortcut, onR
         }
 
         setActiveId(null);
+        setDragSize(null);
+
+        const draggedWidgetId = parseWidgetDragId(active.id);
+        if (draggedWidgetId) {
+            const placed = layout.placedWidgets.find((item) => item.widget.instanceId === draggedWidgetId);
+            if (placed && onWidgetsChange) {
+                const nextPlacement = placementFromDrag(event, placed);
+                if (!samePlacement(placed.placement, nextPlacement)) {
+                    onWidgetsChange(setWidgetPlacement(widgets, draggedWidgetId, nextPlacement));
+                }
+            }
+            return;
+        }
         
         const isMergeAction = mergeTargetId && over && mergeTargetId === over.id;
         setMergeTargetId(null);
@@ -549,6 +642,11 @@ const ShortcutGrid = ({ config, shortcuts, onRemoveShortcut, onEditShortcut, onR
         setIsFolderModalOpen(true);
     };
 
+    const widgetMinCols = widgets.reduce((minCols, widget) => {
+        if (!widget.enabled) return minCols;
+        return Math.max(minCols, getWidgetDefinition(widget.type)?.span?.cols || 1);
+    }, 0);
+
     // Calculate scale to fit screen
     useEffect(() => {
         const handleResize = () => {
@@ -558,7 +656,11 @@ const ShortcutGrid = ({ config, shortcuts, onRemoveShortcut, onEditShortcut, onR
             // Estimate columns that can fit, then clamp to user setting
             const previewGap = calculateGaps(cols, rows).colGap;
             const maxColsFit = Math.max(1, Math.floor((availableWidth + previewGap) / (iconSize + previewGap)));
-            const newCols = Math.max(1, Math.min(cols, maxColsFit));
+            const fittedCols = Math.max(1, Math.min(cols, maxColsFit));
+            // 小组件按图标跨度占位，列数不能少到放不下
+            const newCols = widgetMinCols > 0
+                ? Math.min(cols, Math.max(fittedCols, Math.min(widgetMinCols, cols)))
+                : fittedCols;
             setResponsiveCols(newCols);
 
             const gaps = calculateGaps(newCols, rows);
@@ -575,17 +677,79 @@ const ShortcutGrid = ({ config, shortcuts, onRemoveShortcut, onEditShortcut, onR
         handleResize(); // Initial calculation
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
-    }, [cols, rows, iconSize, leftOffset]);
+    }, [cols, rows, iconSize, leftOffset, widgetMinCols]);
 
-    const itemsPerPage = responsiveCols * rows;
-    const totalPages = Math.ceil(shortcuts.length / itemsPerPage);
+    const layout = arrangeGrid({
+        shortcuts,
+        widgets,
+        cols: responsiveCols,
+        rows,
+    });
 
-    // Get all pages of shortcuts
-    const pages = [];
-    for (let i = 0; i < totalPages; i++) {
-        const start = i * itemsPerPage;
-        pages.push(shortcuts.slice(start, start + itemsPerPage));
-    }
+    useEffect(() => {
+        if (!onWidgetsChange) return;
+        const changed = layout.placedWidgets.filter((item) => !samePlacement(item.widget.placement, item.placement));
+        if (changed.length === 0) return;
+        let next = widgets;
+        changed.forEach((item) => {
+            next = setWidgetPlacement(next, item.widget.instanceId, item.placement);
+        });
+        onWidgetsChange(next);
+    }, [layout, onWidgetsChange, widgets]);
+
+    const placementFromDrag = (event, placed) => {
+        const grid = pageGridRefs.current[placed.placement.page];
+        const initial = event.active?.rect?.current?.initial;
+        if (!grid || !initial) return placed.placement;
+        const bounds = grid.getBoundingClientRect();
+        const styles = window.getComputedStyle(grid);
+        const scaleFactor = grid.offsetWidth ? bounds.width / grid.offsetWidth : 1;
+        const toPx = (value) => (Number.parseFloat(value) || 0) * scaleFactor;
+        const gapX = toPx(styles.columnGap);
+        const gapY = toPx(styles.rowGap);
+        const colTrack = styles.gridTemplateColumns.split(' ').find((part) => part.endsWith('px'));
+        const rowTracks = styles.gridTemplateRows.split(' ').map(toPx).filter((size) => size > 0);
+        const colSize = toPx(colTrack) || (bounds.width - toPx(styles.paddingLeft) - toPx(styles.paddingRight) - (responsiveCols - 1) * gapX) / responsiveCols;
+        const rowSize = rowTracks[0] || (iconSize + 44) * scaleFactor;
+        const originX = bounds.left + toPx(styles.paddingLeft);
+        const originY = bounds.top + toPx(styles.paddingTop);
+        const nextLeft = initial.left + event.delta.x;
+        const nextTop = initial.top + event.delta.y;
+        const colStride = colSize + gapX;
+        const col = Math.round((nextLeft - originX) / colStride);
+        let row = 0;
+        if (rowTracks.length > 1) {
+            let cursor = originY;
+            let bestDistance = Infinity;
+            rowTracks.forEach((size, index) => {
+                const distance = Math.abs(nextTop - cursor);
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    row = index;
+                }
+                cursor += size + gapY;
+            });
+        } else {
+            row = Math.round((nextTop - originY) / (rowSize + gapY));
+        }
+        const occupied = new Set();
+        layout.placedWidgets.forEach((item) => {
+            if (item.widget.instanceId === placed.widget.instanceId) return;
+            if (item.placement.page !== placed.placement.page) return;
+            for (let rowOffset = 0; rowOffset < item.span.rows; rowOffset += 1) {
+                for (let colOffset = 0; colOffset < item.span.cols; colOffset += 1) {
+                    occupied.add(`${item.placement.col + colOffset},${item.placement.row + rowOffset}`);
+                }
+            }
+        });
+        return findNearestSlot(occupied, responsiveCols, rows, placed.span, {
+            page: placed.placement.page,
+            col,
+            row,
+        }) || placed.placement;
+    };
+
+    const totalPages = layout.pageCount;
 
     // Reset page when shortcuts change
     useEffect(() => {
@@ -691,7 +855,7 @@ const ShortcutGrid = ({ config, shortcuts, onRemoveShortcut, onEditShortcut, onR
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [currentPage, goToPage]);
 
-    if (shortcuts.length === 0) {
+    if (shortcuts.length === 0 && layout.placedWidgets.length === 0) {
         return null;
     }
 
@@ -714,29 +878,47 @@ const ShortcutGrid = ({ config, shortcuts, onRemoveShortcut, onEditShortcut, onR
                         transform: `translateX(${-currentPage * 100}%)`,
                     }}
                 >
-                    {pages.map((pageShortcuts, pageIndex) => (
+                    {Array.from({ length: totalPages }, (_, pageIndex) => {
+                        const pageShortcuts = layout.placedShortcuts.filter((item) => item.page === pageIndex);
+                        const pageWidgets = layout.placedWidgets.filter((item) => item.placement.page === pageIndex);
+                        return (
                         <div
                             key={pageIndex}
                             className="shrink-0 w-full flex justify-center"
                         >
                             <SortableContext 
-                                items={pageShortcuts.map(s => s.id)} 
+                                items={pageShortcuts.map((item) => item.shortcut.id)} 
                                 strategy={rectSortingStrategy}
                             >
                                 <div
+                                    ref={(node) => {
+                                        pageGridRefs.current[pageIndex] = node;
+                                    }}
                                     className="grid px-4 py-4 transition-transform duration-300"
-                                    style={{
+                                    style={(() => {
+                                        const rowCount = Math.max(
+                                            1,
+                                            ...pageShortcuts.map((item) => item.row + 1),
+                                            ...pageWidgets.map((item) => item.placement.row + item.span.rows),
+                                        );
+                                        const widgetRows = new Set(pageWidgets.map((item) => item.placement.row));
+                                        const templateRows = Array.from({ length: rowCount }, (_, row) => (
+                                            `${widgetRows.has(row) ? iconSize + 32 : iconSize + 44}px`
+                                        )).join(' ');
+                                        return {
                                         gridTemplateColumns: `repeat(${responsiveCols}, minmax(0, 1fr))`,
+                                        gridTemplateRows: templateRows,
                                         columnGap: `${colGap}px`,
                                         rowGap: `${rowGap}px`,
                                         transform: `scale(${scale})`,
                                         transformOrigin: 'top center',
                                         // Calculate exact width to ensure grid layout is preserved before scaling
                                         width: scale < 1 ? `${(responsiveCols * iconSize) + ((responsiveCols - 1) * colGap)}px` : '100%',
-                                        maxWidth: scale < 1 ? 'none' : '56rem' // 4xl
-                                    }}
+                                        maxWidth: scale < 1 ? 'none' : '56rem',
+                                        };
+                                    })()}
                                 >
-                                    {pageShortcuts.map((shortcut) => (
+                                    {pageShortcuts.map(({ shortcut, col, row }) => (
                                         <SortableShortcutItem 
                                             key={shortcut.id}
                                             shortcut={shortcut}
@@ -748,19 +930,40 @@ const ShortcutGrid = ({ config, shortcuts, onRemoveShortcut, onEditShortcut, onR
                                             onOpenFolder={handleOpenFolder}
                                             isMergeTarget={mergeTargetId === shortcut.id}
                                             showIconBackground={showIconBackground}
+                                            gridColumn={col + 1}
+                                            gridRow={row + 1}
+                                        />
+                                    ))}
+                                    {pageWidgets.map((placed) => (
+                                        <GridWidget
+                                            key={placed.widget.instanceId}
+                                            placed={placed}
+                                            onOpen={onOpenWidget}
+                                            onRemove={(instanceId) => {
+                                                if (onOpenWidget) onOpenWidget(null);
+                                                onWidgetsChange?.(removeWidget(widgets, instanceId));
+                                            }}
                                         />
                                     ))}
                                 </div>
                             </SortableContext>
                         </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
 
             <DragOverlay>
                 {activeId ? (
-                    <div style={{ transform: 'scale(1.05)' }}>
+                    <div style={{ transform: 'scale(1.05)', width: dragSize?.width, height: dragSize?.height }}>
                          {(() => {
+                             const widgetId = parseWidgetDragId(activeId);
+                             if (widgetId) {
+                                 const placed = layout.placedWidgets.find((item) => item.widget.instanceId === widgetId);
+                                 const Card = placed?.definition.Card;
+                                 if (!Card) return null;
+                                 return <Card instance={placed.widget} />;
+                             }
                              const node = findShortcut(activeId);
                              const shortcut = node ? node.shortcut : null;
                              if (!shortcut) return null;

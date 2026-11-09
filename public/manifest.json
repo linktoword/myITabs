@@ -25,6 +25,9 @@
         "https://*.workers.dev/*",
         "https://www.google.com/s2/*",
         "https://*.gstatic.com/faviconV2*",
-        "https://www.baidu.com/sugrec*"
+        "https://www.baidu.com/sugrec*",
+        "https://*.qweatherapi.com/*",
+        "https://devapi.qweather.com/*",
+        "https://geoapi.qweather.com/*"
     ]
 }

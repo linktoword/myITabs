@@ -7,6 +7,7 @@ import ToastContainer from './Toast';
 import { useToast } from '../hooks/useToast';
 import syncService from '../services/syncService';
 import { getLetterLabel } from '../utils/letterIcon';
+import WidgetSettingsPanel from './WidgetSettingsPanel';
 
 const Settings = ({
     gridConfig,
@@ -18,7 +19,9 @@ const Settings = ({
     shortcuts,
     onSyncPull,
     triggerTab,
-    onOpenChange
+    onOpenChange,
+    widgets,
+    onWidgetsChange
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [isWallpaperModalOpen, setIsWallpaperModalOpen] = useState(false);
@@ -68,7 +71,8 @@ const Settings = ({
 
     const tabTitle = activeTab === 'shortcuts' ? '链接'
         : activeTab === 'sync' ? '同步'
-            : '通用';
+            : activeTab === 'widgets' ? '插件'
+                : '通用';
 
     return (
         <>
@@ -108,6 +112,10 @@ const Settings = ({
                                     <AddShortcutForm onAddShortcut={onAddShortcut} showToast={showToast} />
                                 </div>
                             </div>
+                        )}
+
+                        {activeTab === 'widgets' && (
+                            <WidgetSettingsPanel widgets={widgets || []} onChange={onWidgetsChange} />
                         )}
 
                         {activeTab === 'general' && (

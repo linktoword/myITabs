@@ -6,21 +6,23 @@ import ShortcutGrid from './components/ShortcutGrid';
 import TodoPanel from './components/TodoPanel';
 import NotesPanel from './components/NotesPanel';
 import DataManagement from './components/DataManagement';
+import WidgetHost from './components/WidgetHost';
 import { Toast } from './components/Toast';
-import { Globe, Settings as SettingsIcon, Cloud, ClipboardList, StickyNote, Plus, Database } from 'lucide-react';
+import { Settings as SettingsIcon, Cloud, ClipboardList, StickyNote, Plus, Database, LayoutGrid } from 'lucide-react';
 
 import { fetchRandomPhoto, cacheImage } from './utils/unsplash';
 import { removeIconFromCache } from './utils/icons';
 
 // import { arrayMove } from '@dnd-kit/sortable';
 import syncService from './services/syncService';
+import { loadWidgets, saveWidgets } from './widgets/storage';
 
 const DEFAULT_BG_URL = 'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?q=80&w=2070&auto=format&fit=crop';
 
 const DEFAULT_GRID_CONFIG = {
   cols: 8,
   rows: 4,
-  iconSize: 62,
+  iconSize: 56,
   showSearchBar: true,
   showIconBackground: false,
 };
@@ -68,6 +70,14 @@ function App() {
     : notes[0]?.id || null;
   const [isNotesOpen, setIsNotesOpen] = useState(false);
   const [isDataManagementOpen, setIsDataManagementOpen] = useState(false);
+  const [widgets, setWidgets] = useState(loadWidgets);
+  const [openWidgetId, setOpenWidgetId] = useState(null);
+  const handleWidgetsChange = useCallback((next) => {
+    setWidgets(next);
+    setOpenWidgetId((current) => (
+      current && next.some((item) => item.instanceId === current) ? current : null
+    ));
+  }, []);
   const [toast, setToast] = useState(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isLoggedIn, setIsLoggedIn] = useState(syncService.isLoggedIn());
@@ -378,6 +388,10 @@ function App() {
     localStorage.setItem('notes', JSON.stringify(notes));
   }, [notes]);
 
+  useEffect(() => {
+    saveWidgets(widgets);
+  }, [widgets]);
+
   const handleAddTodo = (text) => {
     const newTodo = {
       id: Date.now(),
@@ -587,6 +601,8 @@ function App() {
         onSyncPull={pullFromCloud}
         triggerTab={settingsTrigger}
         onOpenChange={setIsSettingsOpen}
+        widgets={widgets}
+        onWidgetsChange={handleWidgetsChange}
       />
       <div className={`fixed right-6 top-1/2 -translate-y-1/2 z-30 flex flex-col items-center gap-3 liquid-glass-fixed rounded-2xl p-3 shadow-xl transition-all ${isSettingsOpen ? 'opacity-50 pointer-events-none scale-95' : 'opacity-100 pointer-events-auto scale-100'}`}>
         <button
@@ -609,6 +625,13 @@ function App() {
           title="待办列表"
         >
           <ClipboardList className="h-5 w-5" />
+        </button>
+        <button
+          onClick={() => setSettingsTrigger({ tab: 'widgets', at: Date.now() })}
+          className="w-12 h-12 rounded-xl liquid-glass-mini hover:scale-110 hover:border-white/40 text-white flex items-center justify-center transition-all active:scale-95"
+          title="插件"
+        >
+          <LayoutGrid className="h-5 w-5" />
         </button>
         <button
           onClick={() => setSettingsTrigger({ tab: 'general', at: Date.now() })}
@@ -671,6 +694,13 @@ function App() {
           transition: 'margin 300ms ease'
         }}
       >
+      <WidgetHost
+        widgets={widgets}
+        onChange={handleWidgetsChange}
+        onOpenSettings={() => setSettingsTrigger({ tab: 'widgets', at: Date.now() })}
+        openId={openWidgetId}
+        onOpenChange={setOpenWidgetId}
+      />
         {gridConfig.showSearchBar && (
           <div className="w-full flex justify-center">
             <div
@@ -691,9 +721,12 @@ function App() {
         <ShortcutGrid
           config={gridConfig}
           shortcuts={shortcuts}
+          widgets={widgets}
           onRemoveShortcut={handleRemoveShortcut}
           onEditShortcut={handleEditShortcut}
           onReorder={handleReorderShortcuts}
+          onWidgetsChange={handleWidgetsChange}
+          onOpenWidget={setOpenWidgetId}
           leftOffset={isTodoVisible ? 320 : 0}
         />
       </div>
