@@ -12,6 +12,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { useIconSource } from '../hooks/useIconSource';
 import { getLetterBackgroundColor, getLetterLabel, letterTileClassName, letterTileStyle, LETTER_TILE_BOX_STYLE, ICON_GRAPHIC_SIZE } from '../utils/letterIcon';
 import LetterIconGlyph from './LetterIconGlyph';
+import { openInNewTab } from '../utils/openUrl';
 
 const SortableFolderItem = ({ shortcut, onRemove, onEdit, isContextOpen, setContextShortcutId, showIconBackground = false }) => {
     const {
@@ -62,7 +63,7 @@ const SortableFolderItem = ({ shortcut, onRemove, onEdit, isContextOpen, setCont
             return;
         }
         if (shortcut.url) {
-            window.open(shortcut.url, '_self');
+            openInNewTab(shortcut.url);
         }
     };
 

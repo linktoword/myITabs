@@ -23,6 +23,7 @@ import {
     useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { openInNewTab } from '../utils/openUrl';
 
 // Auto-calculate gaps based on grid size
 const calculateGaps = (cols, rows) => {
@@ -187,7 +188,7 @@ const SortableShortcutItem = ({
             style={{ ...style, width: `${Math.max(iconSize + 40, 120)}px` }}
             {...attributes}
             {...listeners}
-            className="group relative flex flex-col items-center gap-3 transition-all duration-300 hover:scale-105 hover:z-10 justify-self-center h-fit touch-none"
+            className="group relative flex flex-col items-center gap-3 transition-all duration-300 hover:scale-105 hover:z-10 justify-self-center h-fit touch-none cursor-pointer"
             onClick={() => {
                 if (isDragging) return;
                 if (contextShortcutId === shortcut.id) return;
@@ -195,7 +196,7 @@ const SortableShortcutItem = ({
                 if (shortcut.type === 'folder') {
                     onOpenFolder(shortcut);
                 } else {
-                    window.location.href = shortcut.url;
+                    openInNewTab(shortcut.url);
                 }
             }}
             onContextMenu={(e) => {
@@ -209,7 +210,7 @@ const SortableShortcutItem = ({
                     if (shortcut.type === 'folder') {
                         onOpenFolder(shortcut);
                     } else {
-                        window.location.href = shortcut.url;
+                        openInNewTab(shortcut.url);
                     }
                 }
             }}
