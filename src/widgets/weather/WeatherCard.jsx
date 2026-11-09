@@ -93,7 +93,7 @@ export default function WeatherCard({ instance, onOpen, onRemove }) {
           )}
         </div>
       </div>
-      <span className="truncate select-none px-1 text-center text-sm font-medium text-white/90 drop-shadow-md">天气</span>
+      <span className="truncate select-none px-1 text-center text-[12px] font-medium leading-4 text-white/90 drop-shadow-md">天气</span>
     </div>
   );
 }

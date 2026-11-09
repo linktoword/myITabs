@@ -193,10 +193,13 @@ const SortableShortcutItem = ({
             ref={setNodeRef}
             style={{
             ...style,
-            width: `${Math.max(iconSize + 40, 120)}px`,
+            // 跟随网格列宽，避免固定 120px 把标题画到相邻图标上
+            width: '100%',
+            minWidth: 0,
+            maxWidth: '100%',
             gridColumn,
             gridRow,
-            justifySelf: 'center',
+            justifySelf: 'stretch',
             alignSelf: 'start',
         }}
             {...attributes}
@@ -245,7 +248,7 @@ const SortableShortcutItem = ({
                     />
                 )}
             </div>
-            <span className="text-sm font-medium text-white/90 drop-shadow-md truncate text-center px-1 select-none" style={{ width: '100%' }}>
+            <span className="w-full truncate px-1 text-center text-[12px] font-medium leading-4 text-white/90 drop-shadow-md select-none">
                 {shortcut.title}
             </span>
         </div>
@@ -975,7 +978,7 @@ const ShortcutGrid = ({
                                          isContextOpen={false}
                                          showIconBackground={showIconBackground}
                                      />
-                                     <span className="text-sm font-medium text-white/90 drop-shadow-md truncate w-full text-center px-1 select-none">
+                                     <span className="w-full truncate px-1 text-center text-[12px] font-medium leading-4 text-white/90 drop-shadow-md select-none">
                                          {shortcut.title}
                                      </span>
                                  </div>
