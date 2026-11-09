@@ -16,6 +16,7 @@ import { removeIconFromCache } from './utils/icons';
 // import { arrayMove } from '@dnd-kit/sortable';
 import syncService from './services/syncService';
 import { loadWidgets, saveWidgets } from './widgets/storage';
+import { bindMiddleClickAsLeftClick } from './utils/middleClick';
 
 const DEFAULT_BG_URL = 'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?q=80&w=2070&auto=format&fit=crop';
 
@@ -319,6 +320,9 @@ function App() {
 
     loadBackground();
   }, []);
+
+  // 中键与左键走同一套点击，避免新标签页被浏览器自动滚动抢走
+  useEffect(() => bindMiddleClickAsLeftClick(), []);
 
   // Disable browser back/forward gestures (two-finger swipe on trackpad)
   useEffect(() => {

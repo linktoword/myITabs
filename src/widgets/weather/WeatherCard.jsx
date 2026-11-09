@@ -22,7 +22,7 @@ export default function WeatherCard({ instance, onOpen, onRemove }) {
   const range = today?.tempMin && today?.tempMax ? `${today.tempMin}° ~ ${today.tempMax}°` : '';
 
   return (
-    <div className="flex h-full w-full flex-col gap-3">
+    <div className="flex h-full w-full flex-col gap-[6px]">
       <div className="group relative min-h-0 flex-1">
         <button
           type="button"

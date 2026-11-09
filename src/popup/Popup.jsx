@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Check, X } from 'lucide-react';
 import IconSelector from '../components/IconSelector';
+import { bindMiddleClickAsLeftClick } from '../utils/middleClick';
 
 const Popup = () => {
     const [url, setUrl] = useState('');
@@ -11,6 +12,8 @@ const Popup = () => {
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
     const [bgUrl] = useState(() => localStorage.getItem('bg_url') || '');
+
+    useEffect(() => bindMiddleClickAsLeftClick(), []);
 
     // Get current tab info and background on mount
     useEffect(() => {

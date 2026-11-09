@@ -78,7 +78,7 @@ const SortableFolderItem = ({ shortcut, onRemove, onEdit, isContextOpen, setCont
             style={style}
             {...attributes}
             {...listeners}
-            className="group relative flex flex-col items-center gap-2 p-2 rounded-xl transition-colors cursor-pointer"
+            className="group relative flex flex-col items-center gap-[6px] p-2 rounded-xl transition-colors cursor-pointer"
             onContextMenu={(e) => {
                 e.preventDefault();
                 e.stopPropagation();

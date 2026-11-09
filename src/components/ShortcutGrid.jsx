@@ -158,12 +158,12 @@ const ShortcutIcon = (props) => {
     return <WebsiteShortcutIcon {...props} />;
 };
 
-const SortableShortcutItem = ({ 
-    shortcut, 
-    iconSize, 
-    contextShortcutId, 
-    setContextShortcutId, 
-    onRemoveShortcut, 
+const SortableShortcutItem = ({
+    shortcut,
+    iconSize,
+    contextShortcutId,
+    setContextShortcutId,
+    onRemoveShortcut,
     setEditingShortcut,
     onOpenFolder,
     isMergeTarget,
@@ -204,11 +204,11 @@ const SortableShortcutItem = ({
         }}
             {...attributes}
             {...listeners}
-            className="group relative flex flex-col items-center gap-3 transition-all duration-300 hover:scale-105 hover:z-10 justify-self-center h-fit touch-none cursor-pointer"
+            className="group relative flex flex-col items-center gap-[6px] transition-all duration-300 hover:scale-105 hover:z-10 justify-self-center h-fit touch-none cursor-pointer"
             onClick={() => {
                 if (isDragging) return;
                 if (contextShortcutId === shortcut.id) return;
-                
+
                 if (shortcut.type === 'folder') {
                     onOpenFolder(shortcut);
                 } else {
@@ -232,9 +232,9 @@ const SortableShortcutItem = ({
             }}
         >
             <div className="relative">
-                <ShortcutIcon 
-                    shortcut={shortcut} 
-                    iconSize={iconSize} 
+                <ShortcutIcon
+                    shortcut={shortcut}
+                    iconSize={iconSize}
                     isContextOpen={contextShortcutId === shortcut.id}
                     onRemove={onRemoveShortcut}
                     onEdit={setEditingShortcut}
@@ -242,7 +242,7 @@ const SortableShortcutItem = ({
                     showIconBackground={showIconBackground}
                 />
                 {isMergeTarget && (
-                    <div 
+                    <div
                         className="absolute -inset-2 border-2 border-dashed border-white/50 rounded-[28px] pointer-events-none animate-pulse bg-white/10"
                         style={{ zIndex: 60 }}
                     />
@@ -325,14 +325,14 @@ const ShortcutGrid = ({
     const lastTimeRef = useRef(0);
     const isChangingRef = useRef(false);
 
-    const { colGap, rowGap } = calculateGaps(responsiveCols, rows);
+    const { colGap } = calculateGaps(responsiveCols, rows);
     const [scale, setScale] = useState(1);
 
     // Custom collision detection strategy
     const collisionDetectionStrategy = useCallback((args) => {
         // 1. Check for overlap (rectIntersection)
         const overlapCollisions = rectIntersection(args);
-        
+
         if (overlapCollisions.length > 0) {
             lastCollisionTypeRef.current = 'overlap';
             return overlapCollisions;
@@ -360,7 +360,7 @@ const ShortcutGrid = ({
     const findShortcut = (id) => {
         const shortcut = shortcuts.find(s => s.id === id);
         if (shortcut) return { shortcut, container: 'root', index: shortcuts.indexOf(shortcut) };
-        
+
         for (const s of shortcuts) {
             if (s.type === 'folder' && s.children) {
                 const child = s.children.find(c => c.id === id);
@@ -394,7 +394,7 @@ const ShortcutGrid = ({
             setMergeTargetId(null);
             return;
         }
-        
+
         // Handle drag out of folder
         const activeNode = findShortcut(active.id);
         if (activeNode && activeNode.container !== 'root') {
@@ -406,15 +406,15 @@ const ShortcutGrid = ({
                         const folderId = activeNode.container;
                         const folder = activeNode.parent;
                         const item = activeNode.shortcut;
-                        
+
                         // Remove from folder
                         const newChildren = folder.children.filter(c => c.id !== item.id);
                         const updatedFolder = { ...folder, children: newChildren };
-                        
+
                         // Insert item into shortcuts (after the folder)
                         const folderIndex = shortcuts.findIndex(s => s.id === folderId);
                         const newShortcuts = [...shortcuts];
-                        
+
                         if (newChildren.length === 0) {
                             // Folder empty, replace with item
                             newShortcuts.splice(folderIndex, 1, item);
@@ -426,7 +426,7 @@ const ShortcutGrid = ({
                             setOpenFolder(updatedFolder);
                             setIsFolderModalOpen(false); // Close modal to allow sorting on grid
                         }
-                        
+
                         if (onReorder) onReorder(newShortcuts);
                         dragOutTimerRef.current = null;
                     }, 400);
@@ -476,7 +476,7 @@ const ShortcutGrid = ({
             lastOverIndexRef.current = currentIndex;
             return;
         }
-        
+
         // Over ID changed, reset timer
         lastOverIdRef.current = over.id;
         lastOverIndexRef.current = currentIndex;
@@ -485,7 +485,7 @@ const ShortcutGrid = ({
             clearTimeout(mergeTimerRef.current);
             mergeTimerRef.current = null;
         }
-        
+
         setMergeTargetId(null);
 
         const activeShortcut = shortcuts.find(s => s.id === active.id);
@@ -514,7 +514,7 @@ const ShortcutGrid = ({
 
     const handleDragEnd = (event) => {
         const { active, over } = event;
-        
+
         if (mergeTimerRef.current) {
             clearTimeout(mergeTimerRef.current);
             mergeTimerRef.current = null;
@@ -539,7 +539,7 @@ const ShortcutGrid = ({
             }
             return;
         }
-        
+
         const isMergeAction = mergeTargetId && over && mergeTargetId === over.id;
         setMergeTargetId(null);
 
@@ -558,11 +558,11 @@ const ShortcutGrid = ({
                     ...overShortcut,
                     children: [...(overShortcut.children || []), activeShortcut]
                 };
-                
+
                 const newShortcuts = shortcuts
                     .filter(s => s.id !== active.id)
                     .map(s => s.id === over.id ? updatedFolder : s);
-                
+
                 if (onReorder) onReorder(newShortcuts);
                 return;
             }
@@ -580,7 +580,7 @@ const ShortcutGrid = ({
                 const newShortcuts = shortcuts
                     .filter(s => s.id !== active.id)
                     .map(s => s.id === over.id ? newFolder : s);
-                
+
                 if (onReorder) onReorder(newShortcuts);
                 return;
             }
@@ -596,7 +596,7 @@ const ShortcutGrid = ({
                 const folder = activeNode.parent;
                 const oldIndex = activeNode.index;
                 const newIndex = overNode.index;
-                
+
                 if (oldIndex !== newIndex) {
                     const newChildren = arrayMove(folder.children, oldIndex, newIndex);
                     handleFolderUpdate({ ...folder, children: newChildren });
@@ -606,7 +606,7 @@ const ShortcutGrid = ({
 
             const oldIndex = shortcuts.findIndex((s) => s.id === active.id);
             const newIndex = shortcuts.findIndex((s) => s.id === over.id);
-            
+
             if (oldIndex !== -1 && newIndex !== -1 && onReorder) {
                 onReorder(arrayMove(shortcuts, oldIndex, newIndex));
             }
@@ -889,8 +889,8 @@ const ShortcutGrid = ({
                             key={pageIndex}
                             className="shrink-0 w-full flex justify-center"
                         >
-                            <SortableContext 
-                                items={pageShortcuts.map((item) => item.shortcut.id)} 
+                            <SortableContext
+                                items={pageShortcuts.map((item) => item.shortcut.id)}
                                 strategy={rectSortingStrategy}
                             >
                                 <div
@@ -911,8 +911,6 @@ const ShortcutGrid = ({
                                         return {
                                         gridTemplateColumns: `repeat(${responsiveCols}, minmax(0, 1fr))`,
                                         gridTemplateRows: templateRows,
-                                        columnGap: `${colGap}px`,
-                                        rowGap: `${rowGap}px`,
                                         transform: `scale(${scale})`,
                                         transformOrigin: 'top center',
                                         // Calculate exact width to ensure grid layout is preserved before scaling
@@ -922,7 +920,7 @@ const ShortcutGrid = ({
                                     })()}
                                 >
                                     {pageShortcuts.map(({ shortcut, col, row }) => (
-                                        <SortableShortcutItem 
+                                        <SortableShortcutItem
                                             key={shortcut.id}
                                             shortcut={shortcut}
                                             iconSize={iconSize}
@@ -971,10 +969,10 @@ const ShortcutGrid = ({
                              const shortcut = node ? node.shortcut : null;
                              if (!shortcut) return null;
                              return (
-                                 <div className="flex flex-col items-center gap-3">
-                                     <ShortcutIcon 
-                                         shortcut={shortcut} 
-                                         iconSize={iconSize} 
+                                 <div className="flex flex-col items-center gap-[6px]">
+                                     <ShortcutIcon
+                                         shortcut={shortcut}
+                                         iconSize={iconSize}
                                          isContextOpen={false}
                                          showIconBackground={showIconBackground}
                                      />
