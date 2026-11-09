@@ -1,37 +1,49 @@
-// Get the best icon URL for a website (Clearbit as primary)
+// 快捷方式图标地址。Clearbit Logo API 已下线，只使用 Google Favicon。
+
+const googleFaviconUrl = (domain) =>
+    `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+
+const hostnameOf = (url) => {
+    try {
+        return new URL(url).hostname;
+    } catch {
+        return '';
+    }
+};
+
+/** 把已保存的 Clearbit 地址换成 Google Favicon，避免继续请求已下线域名 */
+export const normalizeIconUrl = (iconUrl) => {
+    if (!iconUrl || typeof iconUrl !== 'string') return iconUrl;
+    try {
+        const parsed = new URL(iconUrl);
+        if (parsed.hostname !== 'logo.clearbit.com') return iconUrl;
+        const domain = decodeURIComponent(parsed.pathname.replace(/^\/+/, '').split('/')[0] || '');
+        return domain ? googleFaviconUrl(domain) : iconUrl;
+    } catch {
+        return iconUrl;
+    }
+};
+
 export const getIconUrl = (url) => {
-    try {
-        const domain = new URL(url).hostname;
-        return `https://logo.clearbit.com/${domain}`;
-    } catch {
-        return null;
-    }
+    const domain = hostnameOf(url);
+    return domain ? googleFaviconUrl(domain) : null;
 };
 
-// Get all available icon URLs for fallback
+// 自动探测可用的图标地址
 export const getAllIconUrls = (url) => {
-    try {
-        const domain = new URL(url).hostname;
-        return [
-            { source: 'clearbit', url: `https://logo.clearbit.com/${domain}`, name: 'Clearbit' },
-            { source: 'google', url: `https://www.google.com/s2/favicons?domain=${domain}&sz=128`, name: 'Google' }
-        ];
-    } catch {
-        return [];
-    }
+    const domain = hostnameOf(url);
+    if (!domain) return [];
+    return [
+        { source: 'google', url: googleFaviconUrl(domain), name: 'Google' }
+    ];
 };
 
-// Get icon sources object for fallback handling
 export const getIconSources = (url) => {
-    try {
-        const domain = new URL(url).hostname;
-        return {
-            clearbit: `https://logo.clearbit.com/${domain}`,
-            google: `https://www.google.com/s2/favicons?domain=${domain}&sz=128`
-        };
-    } catch {
-        return null;
-    }
+    const domain = hostnameOf(url);
+    if (!domain) return null;
+    return {
+        google: googleFaviconUrl(domain)
+    };
 };
 
 // Remove icon from cache
@@ -48,6 +60,10 @@ export const removeIconFromCache = async (shortcut) => {
         
         // 2. Also try to clean up potential auto-detected URLs
         if (shortcut.url) {
+            const domain = hostnameOf(shortcut.url);
+            if (domain) {
+                await cache.delete(`https://logo.clearbit.com/${domain}`);
+            }
             const candidates = getAllIconUrls(shortcut.url);
             for (const candidate of candidates) {
                 await cache.delete(candidate.url);

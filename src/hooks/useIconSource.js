@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getAllIconUrls } from '../utils/icons';
+import { getAllIconUrls, normalizeIconUrl } from '../utils/icons';
 
 export const useIconSource = (shortcut) => {
     const [iconSrc, setIconSrc] = useState(null);
@@ -23,8 +23,8 @@ export const useIconSource = (shortcut) => {
 
             // 3. Network URL - If user has selected a specific icon, use it directly
             if (shortcut.customIcon?.url) {
-                // User has explicitly chosen this icon, use it directly without probing
-                if (isMounted) setIconSrc(shortcut.customIcon.url);
+                // 用户指定的图标直接使用；旧的 Clearbit 地址改写到 Google
+                if (isMounted) setIconSrc(normalizeIconUrl(shortcut.customIcon.url));
                 return;
             }
 
