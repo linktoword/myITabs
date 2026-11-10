@@ -677,7 +677,7 @@ const ShortcutGrid = ({
     useEffect(() => {
         const handleResize = () => {
             const padding = 48; // Horizontal padding
-            const availableWidth = Math.max(320, window.innerWidth - padding - leftOffset);
+            const availableWidth = Math.max(1, Math.min(1350, window.innerWidth - padding - leftOffset));
 
             // Estimate columns that can fit, then clamp to user setting
             const previewGap = calculateGaps(cols, rows).colGap;
@@ -816,9 +816,13 @@ const ShortcutGrid = ({
         viewportRef.current?.scrollTo({ top: 0 });
     }, [activeCategoryId, viewportRef]);
 
-    const handleAddCategory = () => {
+    const handleAddCategory = (direction, referenceId = activeCategoryId) => {
         const category = createCategory('新分类');
-        onCategoriesChange?.([...categories, category]);
+        const referenceIndex = Math.max(0, categories.findIndex((item) => item.id === referenceId));
+        const insertIndex = direction === 'left' ? referenceIndex : referenceIndex + 1;
+        const nextCategories = [...categories];
+        nextCategories.splice(insertIndex, 0, category);
+        onCategoriesChange?.(nextCategories);
         onActiveCategoryChange?.(category.id);
         setRenameRequestId(category.id);
     };
@@ -865,7 +869,7 @@ const ShortcutGrid = ({
             >
                 <div
                     ref={trackRef}
-                    className="flex w-full items-start will-change-transform"
+                    className="flex min-h-full w-full items-stretch will-change-transform"
                 >
                     {categories.map((category) => {
                         const layout = layouts.find((item) => item.categoryId === category.id);
@@ -902,7 +906,7 @@ const ShortcutGrid = ({
                                         transformOrigin: 'top center',
                                         // Calculate exact width to ensure grid layout is preserved before scaling
                                         width: scale < 1 ? `${(responsiveCols * iconSize) + ((responsiveCols - 1) * colGap)}px` : '100%',
-                                        maxWidth: scale < 1 ? 'none' : '56rem',
+                                        maxWidth: scale < 1 ? 'none' : '1350px',
                                         };
                                     })()}
                                 >

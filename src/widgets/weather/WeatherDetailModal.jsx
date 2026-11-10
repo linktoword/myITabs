@@ -272,7 +272,7 @@ export default function WeatherDetailModal({ instance, onClose, onChange, onOpen
     <div className="fixed inset-0 z-40 flex items-center justify-center p-4 sm:p-8">
       <div className="absolute inset-0 bg-black/35 backdrop-blur-sm" onClick={() => onClose?.()} />
       <div
-        className="relative z-10 flex h-[min(820px,88vh)] w-[min(1120px,96vw)] min-h-0 flex-col overflow-hidden rounded-[28px] border border-white/15 text-white shadow-[0_24px_80px_rgba(0,0,0,0.35)] lg:flex-row"
+        className="relative z-10 flex max-h-[min(820px,88vh)] w-[min(1120px,96vw)] min-h-0 flex-col overflow-hidden rounded-[28px] border border-white/15 text-white shadow-[0_24px_80px_rgba(0,0,0,0.35)] lg:flex-row"
         style={panelStyle}
       >
         <button
@@ -455,7 +455,7 @@ export default function WeatherDetailModal({ instance, onClose, onChange, onOpen
         </div>
 
         {showCities && canRequest && (
-          <aside className="relative flex w-full min-h-0 shrink-0 flex-col overflow-hidden border-t border-white/10 bg-black/15 lg:w-[280px] lg:border-l lg:border-t-0">
+          <aside className="relative flex w-full min-h-0 shrink-0 flex-col overflow-hidden border-t border-white/10 bg-black/15 lg:w-[280px] lg:border-l lg:border-t-0 lg:[contain:size]">
             <div className="flex items-center px-4 py-3">
               <h3 className="text-sm">天气列表</h3>
             </div>
