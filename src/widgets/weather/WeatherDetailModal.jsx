@@ -214,7 +214,7 @@ export default function WeatherDetailModal({ instance, onClose, onChange, onOpen
     if (!canRequest || config.cities.length === 0) return undefined;
     let cancelled = false;
     config.cities.forEach((city) => {
-      fetchCityBrief({ apiHost: config.apiHost, apiKey: config.apiKey, locationId: city.locationId })
+      fetchCityBrief({ apiHost: config.apiHost, apiKey: config.apiKey, locationId: city.locationId, force: true })
         .then((brief) => {
           if (!cancelled) setBriefs((current) => ({ ...current, [city.locationId]: brief }));
         })
@@ -272,7 +272,7 @@ export default function WeatherDetailModal({ instance, onClose, onChange, onOpen
     <div className="fixed inset-0 z-40 flex items-center justify-center p-4 sm:p-8">
       <div className="absolute inset-0 bg-black/35 backdrop-blur-sm" onClick={() => onClose?.()} />
       <div
-        className="relative z-10 flex max-h-[min(820px,88vh)] w-[min(1120px,96vw)] min-h-0 flex-col overflow-hidden rounded-[28px] border border-white/15 text-white shadow-[0_24px_80px_rgba(0,0,0,0.35)] lg:flex-row"
+        className="relative z-10 flex h-[min(820px,88vh)] w-[min(1120px,96vw)] min-h-0 flex-col overflow-hidden rounded-[28px] border border-white/15 text-white shadow-[0_24px_80px_rgba(0,0,0,0.35)] lg:flex-row"
         style={panelStyle}
       >
         <button
@@ -344,8 +344,8 @@ export default function WeatherDetailModal({ instance, onClose, onChange, onOpen
               </div>
               {message && <p className="text-xs text-red-200">{message}</p>}
 
-              {weather.status === 'loading' && <div className="h-40 animate-pulse rounded-2xl bg-white/10" />}
-              {weather.status === 'error' && (
+              {weather.status === 'loading' && !weather.data && <div className="h-40 animate-pulse rounded-2xl bg-white/10" />}
+              {weather.status === 'error' && !weather.data && (
                 <div className="rounded-2xl bg-white/5 px-4 py-6 text-center">
                   <p>{weather.error}</p>
                   <button type="button" onClick={() => setReloadToken((value) => value + 1)} className="mt-3 text-sm underline">
@@ -354,7 +354,9 @@ export default function WeatherDetailModal({ instance, onClose, onChange, onOpen
                 </div>
               )}
 
-              {weather.status === 'ready' && (
+              {(weather.status === 'ready'
+                || (weather.status === 'loading' && weather.data)
+                || (weather.status === 'error' && weather.data)) && (
                 <>
                   <div className="flex flex-wrap items-end justify-between gap-6">
                     <div className="text-6xl font-medium leading-none tracking-tight">{weather.data.now?.temp}°</div>
@@ -478,14 +480,14 @@ export default function WeatherDetailModal({ instance, onClose, onChange, onOpen
                         title={`移除${city.name}`}
                         aria-label={`移除${city.name}`}
                         onClick={() => removeCity(city.locationId)}
-                        className="absolute right-2 top-2 z-10 rounded-full bg-black/25 p-1 text-white/70 opacity-0 transition hover:bg-black/50 hover:text-white group-hover:opacity-100 group-focus-within:opacity-100 focus:opacity-100"
+                        className="absolute right-2 top-2 z-10 cursor-pointer rounded-full bg-black/25 p-1 text-white/70 opacity-0 transition hover:bg-black/50 hover:text-white group-hover:opacity-100 group-focus-within:opacity-100 focus:opacity-100"
                       >
                         <X className="h-3.5 w-3.5" />
                       </button>
                       <button
                         type="button"
                         onClick={() => updateConfig({ ...config, activeLocationId: city.locationId })}
-                        className="flex w-full items-start justify-between gap-3 pr-6 text-left"
+                        className="flex w-full cursor-pointer items-start justify-between gap-3 pr-6 text-left"
                       >
                         <div>
                           <div className="text-sm">

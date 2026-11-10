@@ -11,13 +11,20 @@ export function useWeatherBundle({ apiHost, apiKey, locationId, reloadToken = 0 
   useEffect(() => {
     if (!ready) return undefined;
     let cancelled = false;
-    fetchWeatherBundle({ apiHost, apiKey, locationId })
+    // hook 挂载或参数变化就是天气插件加载、打开弹框和切换城市的刷新时机。
+    fetchWeatherBundle({ apiHost, apiKey, locationId, force: true })
       .then((data) => {
         if (!cancelled) setState({ status: 'ready', locationId, data, error: '' });
       })
       .catch((error) => {
         if (!cancelled) {
-          setState({ status: 'error', locationId, data: null, error: error.message || '天气获取失败' });
+          // 请求失败时保留旧数据，避免刷新期间详情弹框内容塌缩。
+          setState((current) => ({
+            status: 'error',
+            locationId,
+            data: current.data,
+            error: error.message || '天气获取失败',
+          }));
         }
       });
     return () => {
@@ -27,7 +34,8 @@ export function useWeatherBundle({ apiHost, apiKey, locationId, reloadToken = 0 
 
   if (!ready) return { status: 'unconfigured', data: null, error: '' };
   if (state.locationId !== locationId || state.status === 'idle') {
-    return { status: 'loading', data: null, error: '' };
+    // 城市切换时继续展示上一份数据，避免弹框先缩小再恢复。
+    return { status: 'loading', data: state.data, error: '' };
   }
   return state;
 }

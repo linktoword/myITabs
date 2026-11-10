@@ -7,7 +7,7 @@ import { useWeatherBundle } from './useWeatherBundle';
 import { normalizeWeatherConfig } from '../../services/qweather';
 
 const cardStyle = {
-  background: 'linear-gradient(115deg, rgba(24, 69, 132, 0.94), rgba(56, 105, 172, 0.88))',
+  background: 'linear-gradient(35deg, #154280 30%, #335693, #a8b3d2)',
 };
 
 export default function WeatherCard({ instance, onOpen, onRemove }) {
@@ -53,7 +53,7 @@ export default function WeatherCard({ instance, onOpen, onRemove }) {
             </div>
           )}
 
-          {weather.status === 'loading' && (
+          {weather.status === 'loading' && !weather.data && (
             <div className="flex w-full animate-pulse items-center justify-between">
               <div className="space-y-3">
                 <div className="h-3 w-12 rounded bg-white/20" />
@@ -73,7 +73,7 @@ export default function WeatherCard({ instance, onOpen, onRemove }) {
             </div>
           )}
 
-          {weather.status === 'ready' && (
+          {(weather.status === 'ready' || (weather.status === 'loading' && weather.data)) && (
             <div className="flex w-full items-center justify-between gap-2">
               <div className="min-w-0">
                 <div className="flex items-center gap-1 text-xs leading-none text-white/95">

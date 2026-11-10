@@ -148,10 +148,11 @@ function toBrief(now, daily) {
 }
 
 /** 实况、逐小时、7 天，以及可选的空气质量和生活指数 */
-export function fetchWeatherBundle({ apiHost, apiKey, locationId }) {
+export function fetchWeatherBundle({ apiHost, apiKey, locationId, force = false }) {
   const host = normalizeQWeatherHost(apiHost);
   const key = cacheKey(host, 'bundle', locationId);
-  const cached = readCache(key);
+  // 组件加载、打开详情和切换城市时需要主动刷新，force 时跳过缓存读取。
+  const cached = force ? null : readCache(key);
   if (cached) return Promise.resolve(cached);
 
   return shareRequest(key, async () => {
@@ -177,12 +178,13 @@ export function fetchWeatherBundle({ apiHost, apiKey, locationId }) {
 }
 
 /** 城市列表只需要当前温度和当天高低 */
-export function fetchCityBrief({ apiHost, apiKey, locationId }) {
+export function fetchCityBrief({ apiHost, apiKey, locationId, force = false }) {
   const host = normalizeQWeatherHost(apiHost);
   const key = cacheKey(host, 'brief', locationId);
-  const cached = readCache(key);
+  // 城市列表也要跟随详情弹框打开和城市切换刷新。
+  const cached = force ? null : readCache(key);
   if (cached) return Promise.resolve(cached);
-  const bundled = readCache(cacheKey(host, 'bundle', locationId));
+  const bundled = force ? null : readCache(cacheKey(host, 'bundle', locationId));
   if (bundled) {
     const brief = toBrief(bundled.now, bundled.daily);
     writeCache(key, brief);
