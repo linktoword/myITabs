@@ -16,11 +16,15 @@ function normalizePlacement(value) {
   const row = Number(value.row);
   const page = Number(value.page);
   if (!Number.isInteger(col) || !Number.isInteger(row) || col < 0 || row < 0) return null;
-  return {
+  const placement = {
     page: Number.isInteger(page) && page >= 0 ? page : 0,
     col,
     row,
   };
+  if (typeof value.categoryId === 'string' && value.categoryId) {
+    placement.categoryId = value.categoryId;
+  }
+  return placement;
 }
 
 /** 过滤坏数据并按顺序重排，避免某个组件写坏整份列表 */

@@ -2,6 +2,13 @@ import { useState, useEffect } from 'react';
 import { Check, X } from 'lucide-react';
 import IconSelector from '../components/IconSelector';
 import { bindMiddleClickAsLeftClick } from '../utils/middleClick';
+import {
+    CATEGORIES_KEY,
+    loadActiveCategoryId,
+    normalizeBookmarkState,
+    resolveActiveCategoryId,
+    saveCategories,
+} from '../utils/categories';
 
 const Popup = () => {
     const [url, setUrl] = useState('');
@@ -42,15 +49,6 @@ const Popup = () => {
         setSaving(true);
 
         try {
-            // Create new shortcut
-            const newShortcut = {
-                id: Date.now(),
-                url: url,
-                title: title,
-                customIcon: customIcon,
-                iconPadding: iconPadding
-            };
-
             // 1. Get existing shortcuts from both sources to be safe
             const lsData = localStorage.getItem('shortcuts');
             let lsShortcuts = lsData ? JSON.parse(lsData) : [];
@@ -64,8 +62,27 @@ const Popup = () => {
                 currentShortcuts = csShortcuts;
             }
 
+            const storedCategories = localStorage.getItem(CATEGORIES_KEY);
+            const normalized = normalizeBookmarkState({
+                categories: storedCategories ? JSON.parse(storedCategories) : [],
+                shortcuts: currentShortcuts,
+                widgets: [],
+            });
+            saveCategories(normalized.categories);
+            const categoryId = resolveActiveCategoryId(normalized.categories, loadActiveCategoryId());
+
+            // Create new shortcut in the category currently open on the new tab
+            const newShortcut = {
+                id: Date.now(),
+                url: url,
+                title: title,
+                customIcon: customIcon,
+                iconPadding: iconPadding,
+                categoryId,
+            };
+
             // 2. Add new shortcut
-            const updatedShortcuts = [...currentShortcuts, newShortcut];
+            const updatedShortcuts = [...normalized.shortcuts, newShortcut];
 
             // 3. Save to localStorage (Primary for App.jsx)
             localStorage.setItem('shortcuts', JSON.stringify(updatedShortcuts));

@@ -40,7 +40,7 @@ const Layout = ({ children, backgroundUrl, bgConfig }) => {
 
     return (
         <div
-            className="relative min-h-screen w-full overflow-hidden bg-gray-900 text-white"
+            className="relative h-screen w-full overflow-hidden bg-gray-900 text-white"
             style={{ overscrollBehaviorX: 'none' }}
         >
             {/* Background Image */}
@@ -63,7 +63,7 @@ const Layout = ({ children, backgroundUrl, bgConfig }) => {
             </div>
 
             {/* Content */}
-            <div className="relative z-10 flex min-h-screen flex-col items-center justify-start pt-16 p-8">
+            <div className="relative z-10 flex h-full min-h-0 flex-col items-center justify-start px-8 pb-6 pt-16">
                 {children}
             </div>
         </div>

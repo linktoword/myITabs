@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Trash2, Edit2 } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { Trash2, Edit2 } from 'lucide-react';
 import { useIconSource } from '../hooks/useIconSource';
 import EditShortcutModal from './EditShortcutModal';
 import FolderIcon from './FolderIcon';
@@ -7,6 +7,14 @@ import FolderModal from './FolderModal';
 import { getLetterBackgroundColor, getLetterLabel, letterTileClassName, letterTileStyle, LETTER_TILE_BOX_STYLE, ICON_GRAPHIC_SIZE } from '../utils/letterIcon';
 import LetterIconGlyph from './LetterIconGlyph';
 import { arrangeGrid, findNearestSlot, samePlacement } from '../widgets/layout';
+import { useCategoryPager } from '../hooks/useCategoryPager';
+import CategorySwitcher from './CategorySwitcher';
+import {
+    categoryHasContent,
+    createCategory,
+    moveCategoryContents,
+    reorderWithinCategory,
+} from '../utils/categories';
 import { getWidgetDefinition } from '../widgets/registry';
 import { removeWidget, setWidgetPlacement } from '../widgets/storage';
 import {
@@ -292,20 +300,30 @@ const GridWidget = ({ placed, onOpen, onRemove }) => {
     );
 };
 
+function widgetInCategory(widget, categoryId, activeCategoryId) {
+    const assigned = widget.placement?.categoryId;
+    if (assigned) return assigned === categoryId;
+    return categoryId === activeCategoryId;
+}
+
 const ShortcutGrid = ({
     config,
     shortcuts,
+    categories = [],
+    activeCategoryId,
     widgets = [],
     onRemoveShortcut,
     onEditShortcut,
     onReorder,
+    onCategoriesChange,
+    onActiveCategoryChange,
     onWidgetsChange,
     onOpenWidget,
     leftOffset = 0,
 }) => {
     const { cols = 5, rows = 3, iconSize = 96, showIconBackground = false } = config || {};
-    const [currentPage, setCurrentPage] = useState(0);
     const [contextShortcutId, setContextShortcutId] = useState(null);
+    const [renameRequestId, setRenameRequestId] = useState(null);
     const [editingShortcut, setEditingShortcut] = useState(null);
     const [responsiveCols, setResponsiveCols] = useState(cols);
     const [activeId, setActiveId] = useState(null);
@@ -319,11 +337,7 @@ const ShortcutGrid = ({
     const lastOverIndexRef = useRef(null);
     const lastCollisionTypeRef = useRef(null);
 
-    const containerRef = useRef(null);
-    const pageGridRefs = useRef([]);
-    const accumulatedRef = useRef(0);
-    const lastTimeRef = useRef(0);
-    const isChangingRef = useRef(false);
+    const pageGridRefs = useRef({});
 
     const { colGap } = calculateGaps(responsiveCols, rows);
     const [scale, setScale] = useState(1);
@@ -405,7 +419,7 @@ const ShortcutGrid = ({
                     dragOutTimerRef.current = setTimeout(() => {
                         const folderId = activeNode.container;
                         const folder = activeNode.parent;
-                        const item = activeNode.shortcut;
+                        const item = { ...activeNode.shortcut, categoryId: folder.categoryId || activeNode.shortcut.categoryId };
 
                         // Remove from folder
                         const newChildren = folder.children.filter(c => c.id !== item.id);
@@ -530,7 +544,7 @@ const ShortcutGrid = ({
 
         const draggedWidgetId = parseWidgetDragId(active.id);
         if (draggedWidgetId) {
-            const placed = layout.placedWidgets.find((item) => item.widget.instanceId === draggedWidgetId);
+            const placed = placedWidgets.find((item) => item.widget.instanceId === draggedWidgetId);
             if (placed && onWidgetsChange) {
                 const nextPlacement = placementFromDrag(event, placed);
                 if (!samePlacement(placed.placement, nextPlacement)) {
@@ -574,6 +588,7 @@ const ShortcutGrid = ({
                     id: createFolderId(),
                     title: 'Folder',
                     type: 'folder',
+                    categoryId: overShortcut.categoryId || activeShortcut.categoryId,
                     children: [overShortcut, activeShortcut]
                 };
 
@@ -604,11 +619,19 @@ const ShortcutGrid = ({
                 return;
             }
 
-            const oldIndex = shortcuts.findIndex((s) => s.id === active.id);
-            const newIndex = shortcuts.findIndex((s) => s.id === over.id);
-
-            if (oldIndex !== -1 && newIndex !== -1 && onReorder) {
-                onReorder(arrayMove(shortcuts, oldIndex, newIndex));
+            if (
+                activeNode
+                && overNode
+                && activeNode.container === 'root'
+                && overNode.container === 'root'
+                && onReorder
+            ) {
+                onReorder(reorderWithinCategory(
+                    shortcuts,
+                    activeNode.shortcut.categoryId,
+                    active.id,
+                    over.id,
+                ));
             }
         }
     };
@@ -682,26 +705,36 @@ const ShortcutGrid = ({
         return () => window.removeEventListener('resize', handleResize);
     }, [cols, rows, iconSize, leftOffset, widgetMinCols]);
 
-    const layout = arrangeGrid({
-        shortcuts,
-        widgets,
-        cols: responsiveCols,
-        rows,
-    });
+    const layouts = useMemo(() => (
+        categories.map((category) => arrangeGrid({
+            shortcuts: shortcuts.filter((item) => item.categoryId === category.id),
+            widgets: widgets.filter((item) => widgetInCategory(item, category.id, activeCategoryId)),
+            cols: responsiveCols,
+            rows,
+            singlePage: true,
+            categoryId: category.id,
+        }))
+    ), [activeCategoryId, categories, responsiveCols, rows, shortcuts, widgets]);
+
+    const placedWidgets = layouts.flatMap((item) => item.placedWidgets);
 
     useEffect(() => {
         if (!onWidgetsChange) return;
-        const changed = layout.placedWidgets.filter((item) => !samePlacement(item.widget.placement, item.placement));
-        if (changed.length === 0) return;
         let next = widgets;
-        changed.forEach((item) => {
-            next = setWidgetPlacement(next, item.widget.instanceId, item.placement);
+        let changed = false;
+        layouts.forEach((layout) => {
+            layout.placedWidgets.forEach((item) => {
+                if (samePlacement(item.widget.placement, item.placement)) return;
+                next = setWidgetPlacement(next, item.widget.instanceId, item.placement);
+                changed = true;
+            });
         });
-        onWidgetsChange(next);
-    }, [layout, onWidgetsChange, widgets]);
+        if (changed) onWidgetsChange(next);
+    }, [layouts, onWidgetsChange, widgets]);
 
     const placementFromDrag = (event, placed) => {
-        const grid = pageGridRefs.current[placed.placement.page];
+        const categoryId = placed.placement.categoryId;
+        const grid = pageGridRefs.current[categoryId];
         const initial = event.active?.rect?.current?.initial;
         if (!grid || !initial) return placed.placement;
         const bounds = grid.getBoundingClientRect();
@@ -736,31 +769,23 @@ const ShortcutGrid = ({
             row = Math.round((nextTop - originY) / (rowSize + gapY));
         }
         const occupied = new Set();
-        layout.placedWidgets.forEach((item) => {
+        const categoryLayout = layouts.find((item) => item.categoryId === categoryId);
+        (categoryLayout?.placedWidgets || []).forEach((item) => {
             if (item.widget.instanceId === placed.widget.instanceId) return;
-            if (item.placement.page !== placed.placement.page) return;
             for (let rowOffset = 0; rowOffset < item.span.rows; rowOffset += 1) {
                 for (let colOffset = 0; colOffset < item.span.cols; colOffset += 1) {
                     occupied.add(`${item.placement.col + colOffset},${item.placement.row + rowOffset}`);
                 }
             }
         });
-        return findNearestSlot(occupied, responsiveCols, rows, placed.span, {
-            page: placed.placement.page,
+        const slot = findNearestSlot(occupied, responsiveCols, rows, placed.span, {
+            page: 0,
             col,
             row,
-        }) || placed.placement;
+        }, true);
+        if (!slot) return placed.placement;
+        return { ...slot, page: 0, categoryId };
     };
-
-    const totalPages = layout.pageCount;
-
-    // Reset page when shortcuts change
-    useEffect(() => {
-        if (currentPage >= totalPages && totalPages > 0) {
-            const frame = requestAnimationFrame(() => setCurrentPage(totalPages - 1));
-            return () => cancelAnimationFrame(frame);
-        }
-    }, [shortcuts.length, totalPages, currentPage]);
 
     useEffect(() => {
         if (contextShortcutId && !shortcuts.some(s => s.id === contextShortcutId)) {
@@ -776,93 +801,56 @@ const ShortcutGrid = ({
         return () => document.removeEventListener('click', handleClickAway);
     }, [contextShortcutId]);
 
-    // Snap to page
-    const goToPage = useCallback((targetPage) => {
-        const clampedPage = Math.max(0, Math.min(totalPages - 1, targetPage));
-        if (clampedPage !== currentPage) {
-            isChangingRef.current = true;
-            setCurrentPage(clampedPage);
-            // Allow next page change after animation
-            setTimeout(() => {
-                isChangingRef.current = false;
-                accumulatedRef.current = 0;
-            }, 600);
+    const activeIndex = Math.max(0, categories.findIndex((item) => item.id === activeCategoryId));
+    const { viewportRef, trackRef, progress, goTo } = useCategoryPager({
+        count: Math.max(categories.length, 1),
+        index: categories.length ? activeIndex : 0,
+        suspended: isFolderModalOpen || !!editingShortcut || !!activeId,
+        onIndexChange: (nextIndex) => {
+            const next = categories[nextIndex];
+            if (next && next.id !== activeCategoryId) onActiveCategoryChange?.(next.id);
+        },
+    });
+
+    useEffect(() => {
+        viewportRef.current?.scrollTo({ top: 0 });
+    }, [activeCategoryId, viewportRef]);
+
+    const handleAddCategory = () => {
+        const category = createCategory('新分类');
+        onCategoriesChange?.([...categories, category]);
+        onActiveCategoryChange?.(category.id);
+        setRenameRequestId(category.id);
+    };
+
+    const handleRenameCategory = (id, title) => {
+        onCategoriesChange?.(categories.map((item) => (item.id === id ? { ...item, title } : item)));
+        setRenameRequestId(null);
+    };
+
+    const handleDeleteCategory = (category) => {
+        if (categories.length <= 1) return;
+        const index = categories.findIndex((item) => item.id === category.id);
+        const target = categories[index - 1] || categories[index + 1];
+        if (!target) return;
+        let nextShortcuts = shortcuts;
+        let nextWidgets = widgets;
+        if (categoryHasContent(shortcuts, widgets, category.id)) {
+            const confirmed = window.confirm(`「${category.title}」里的书签会移到「${target.title}」。`);
+            if (!confirmed) return;
+            const moved = moveCategoryContents(shortcuts, widgets, category.id, target.id);
+            nextShortcuts = moved.shortcuts;
+            nextWidgets = moved.widgets;
         }
-    }, [totalPages, currentPage]);
-
-    // Wheel handler for mouse wheel (vertical) and trackpad (horizontal)
-    useEffect(() => {
-        if (totalPages <= 1) return;
-
-        const handleWheel = (e) => {
-            // Skip if page change is in progress
-            if (isChangingRef.current) return;
-
-            const now = Date.now();
-
-            // Reset if new gesture (gap > 200ms)
-            if (now - lastTimeRef.current > 200) {
-                accumulatedRef.current = 0;
-            }
-            lastTimeRef.current = now;
-
-            let scrollDelta = 0;
-
-            // Detect input type:
-            // - Trackpad horizontal swipe: deltaX is dominant
-            // - Mouse wheel vertical: deltaY is present, deltaX is 0 or minimal
-            const isHorizontalSwipe = Math.abs(e.deltaX) > Math.abs(e.deltaY);
-            const isMouseWheel = e.deltaX === 0 && e.deltaY !== 0;
-
-            if (isHorizontalSwipe) {
-                // Trackpad horizontal swipe
-                scrollDelta = e.deltaX;
-            } else if (isMouseWheel) {
-                // Mouse wheel vertical scroll
-                scrollDelta = e.deltaY;
-            } else {
-                // Ignore diagonal or vertical trackpad scroll
-                return;
-            }
-
-            // Accumulate scroll
-            accumulatedRef.current += scrollDelta;
-
-            // Trigger page change at threshold
-            const threshold = 50;
-
-            if (accumulatedRef.current > threshold) {
-                goToPage(currentPage + 1);
-                accumulatedRef.current = 0; // Reset immediately
-            } else if (accumulatedRef.current < -threshold) {
-                goToPage(currentPage - 1);
-                accumulatedRef.current = 0; // Reset immediately
-            }
-        };
-
-        window.addEventListener('wheel', handleWheel, { passive: true });
-        return () => window.removeEventListener('wheel', handleWheel);
-    }, [totalPages, currentPage, goToPage]);
-
-    // Keyboard navigation
-    useEffect(() => {
-        const handleKeyDown = (e) => {
-            if (e.key === 'ArrowLeft') {
-                goToPage(currentPage - 1);
-            } else if (e.key === 'ArrowRight') {
-                goToPage(currentPage + 1);
-            }
-        };
-
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [currentPage, goToPage]);
-
-    if (shortcuts.length === 0 && layout.placedWidgets.length === 0) {
-        return null;
-    }
+        onCategoriesChange?.(
+            categories.filter((item) => item.id !== category.id),
+            { shortcuts: nextShortcuts, widgets: nextWidgets },
+        );
+        if (activeCategoryId === category.id) onActiveCategoryChange?.(target.id);
+    };
 
     return (
+        <div className="flex min-h-0 w-full flex-1 flex-col">
         <DndContext
             sensors={sensors}
             collisionDetection={collisionDetectionStrategy}
@@ -870,24 +858,23 @@ const ShortcutGrid = ({
             onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
         >
-            {/* Swipeable Container */}
             <div
-                ref={containerRef}
-                className="w-full overflow-x-hidden"
+                ref={viewportRef}
+                className="min-h-0 w-full flex-1 overflow-x-hidden overflow-y-auto"
+                style={{ touchAction: 'pan-y', overscrollBehavior: 'contain' }}
             >
                 <div
-                    className="flex transition-transform duration-300 ease-out"
-                    style={{
-                        transform: `translateX(${-currentPage * 100}%)`,
-                    }}
+                    ref={trackRef}
+                    className="flex w-full items-start will-change-transform"
                 >
-                    {Array.from({ length: totalPages }, (_, pageIndex) => {
-                        const pageShortcuts = layout.placedShortcuts.filter((item) => item.page === pageIndex);
-                        const pageWidgets = layout.placedWidgets.filter((item) => item.placement.page === pageIndex);
+                    {categories.map((category) => {
+                        const layout = layouts.find((item) => item.categoryId === category.id);
+                        const pageShortcuts = layout?.placedShortcuts || [];
+                        const pageWidgets = layout?.placedWidgets || [];
                         return (
                         <div
-                            key={pageIndex}
-                            className="shrink-0 w-full flex justify-center"
+                            key={category.id}
+                            className="flex w-full shrink-0 grow-0 basis-full justify-center"
                         >
                             <SortableContext
                                 items={pageShortcuts.map((item) => item.shortcut.id)}
@@ -895,7 +882,7 @@ const ShortcutGrid = ({
                             >
                                 <div
                                     ref={(node) => {
-                                        pageGridRefs.current[pageIndex] = node;
+                                        pageGridRefs.current[category.id] = node;
                                     }}
                                     className="grid px-4 py-4 transition-transform duration-300"
                                     style={(() => {
@@ -919,6 +906,11 @@ const ShortcutGrid = ({
                                         };
                                     })()}
                                 >
+                                    {pageShortcuts.length === 0 && pageWidgets.length === 0 && (
+                                        <div className="col-span-full py-16 text-center text-sm text-white/50">
+                                            这个分类还是空的
+                                        </div>
+                                    )}
                                     {pageShortcuts.map(({ shortcut, col, row }) => (
                                         <SortableShortcutItem
                                             key={shortcut.id}
@@ -960,7 +952,7 @@ const ShortcutGrid = ({
                          {(() => {
                              const widgetId = parseWidgetDragId(activeId);
                              if (widgetId) {
-                                 const placed = layout.placedWidgets.find((item) => item.widget.instanceId === widgetId);
+                                 const placed = placedWidgets.find((item) => item.widget.instanceId === widgetId);
                                  const Card = placed?.definition.Card;
                                  if (!Card) return null;
                                  return <Card instance={placed.widget} />;
@@ -985,46 +977,6 @@ const ShortcutGrid = ({
                     </div>
                 ) : null}
             </DragOverlay>
-
-            {/* Fixed Pagination Controls */}
-            {totalPages > 1 && (
-                <div className="fixed bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-4 liquid-glass-fixed rounded-full px-4 py-2">
-                    <button
-                        onClick={() => goToPage(currentPage - 1)}
-                        disabled={currentPage === 0}
-                        className={`p-1.5 rounded-full transition-all ${currentPage === 0
-                            ? 'opacity-30 cursor-not-allowed'
-                            : 'liquid-glass-mini hover:scale-110 text-white active:scale-90'
-                            }`}
-                    >
-                        <ChevronLeft className="h-4 w-4" />
-                    </button>
-
-                    <div className="flex gap-2">
-                        {Array.from({ length: totalPages }).map((_, index) => (
-                            <button
-                                key={index}
-                                onClick={() => goToPage(index)}
-                                className={`h-2 rounded-full transition-all duration-300 ${index === currentPage
-                                    ? 'bg-white/90 shadow-lg shadow-white/25 w-6'
-                                    : 'bg-white/40 hover:bg-white/70 hover:shadow-md hover:shadow-white/20 w-2'
-                                    }`}
-                            />
-                        ))}
-                    </div>
-
-                    <button
-                        onClick={() => goToPage(currentPage + 1)}
-                        disabled={currentPage === totalPages - 1}
-                        className={`p-1.5 rounded-full transition-all ${currentPage === totalPages - 1
-                            ? 'opacity-30 cursor-not-allowed'
-                            : 'liquid-glass-mini hover:scale-110 text-white active:scale-90'
-                            }`}
-                    >
-                        <ChevronRight className="h-4 w-4" />
-                    </button>
-                </div>
-            )}
 
             <EditShortcutModal
                 key={editingShortcut?.id || 'closed'}
@@ -1053,6 +1005,17 @@ const ShortcutGrid = ({
                 showIconBackground={showIconBackground}
             />
         </DndContext>
+        <CategorySwitcher
+            categories={categories}
+            progress={progress}
+            renameRequestId={renameRequestId}
+            onSelect={goTo}
+            onRename={handleRenameCategory}
+            onEditEnd={() => setRenameRequestId(null)}
+            onAdd={handleAddCategory}
+            onDelete={handleDeleteCategory}
+        />
+        </div>
     );
 };
 

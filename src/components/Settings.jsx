@@ -8,6 +8,8 @@ import { useToast } from '../hooks/useToast';
 import syncService from '../services/syncService';
 import { getLetterLabel } from '../utils/letterIcon';
 import WidgetSettingsPanel from './WidgetSettingsPanel';
+import { CATEGORIES_KEY, mergeCategoryLists, normalizeBookmarkState, saveCategories } from '../utils/categories';
+import { loadWidgets, saveWidgets } from '../widgets/storage';
 
 const Settings = ({
     gridConfig,
@@ -21,7 +23,8 @@ const Settings = ({
     triggerTab,
     onOpenChange,
     widgets,
-    onWidgetsChange
+    onWidgetsChange,
+    categories,
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [isWallpaperModalOpen, setIsWallpaperModalOpen] = useState(false);
@@ -330,6 +333,7 @@ const Settings = ({
                                                 // Collect all data to sync
                                                 const data = {
                                                     shortcuts,
+                                                    categories,
                                                     gridConfig,
                                                     bgConfig,
                                                     bgUrl: localStorage.getItem('bg_url') || ''
@@ -553,6 +557,15 @@ const LoginForm = ({ onLogin, showToast, onSyncPull }) => {
                 }
             });
             const mergedShortcuts = Array.from(shortcutMap.values());
+            const mergedCategories = mergeCategoryLists(
+                JSON.parse(localStorage.getItem(CATEGORIES_KEY) || '[]'),
+                cloudData.categories || [],
+            );
+            const normalizedBookmarks = normalizeBookmarkState({
+                categories: mergedCategories,
+                shortcuts: mergedShortcuts,
+                widgets: loadWidgets(),
+            });
 
             // Merge todos - deduplicate by ID, keep latest
             const localTodos = JSON.parse(localStorage.getItem('todos') || '[]');
@@ -582,7 +595,8 @@ const LoginForm = ({ onLogin, showToast, onSyncPull }) => {
 
             // Prepare merged data
             const mergedData = {
-                shortcuts: mergedShortcuts,
+                shortcuts: normalizedBookmarks.shortcuts,
+                categories: normalizedBookmarks.categories,
                 todos: mergedTodos,
                 notes: mergedNotes,
                 gridConfig: cloudData.gridConfig || JSON.parse(localStorage.getItem('grid_config') || '{}'),
@@ -592,6 +606,8 @@ const LoginForm = ({ onLogin, showToast, onSyncPull }) => {
 
             // Apply merged data to localStorage
             localStorage.setItem('shortcuts', JSON.stringify(mergedData.shortcuts));
+            saveCategories(mergedData.categories);
+            saveWidgets(normalizedBookmarks.widgets);
             localStorage.setItem('todos', JSON.stringify(mergedData.todos));
             localStorage.setItem('notes', JSON.stringify(mergedData.notes));
             localStorage.setItem('grid_config', JSON.stringify(mergedData.gridConfig));
@@ -631,6 +647,7 @@ const LoginForm = ({ onLogin, showToast, onSyncPull }) => {
             try {
                 const localData = {
                     shortcuts: JSON.parse(localStorage.getItem('shortcuts') || '[]'),
+                    categories: JSON.parse(localStorage.getItem(CATEGORIES_KEY) || '[]'),
                     todos: JSON.parse(localStorage.getItem('todos') || '[]'),
                     notes: JSON.parse(localStorage.getItem('notes') || '[]'),
                     gridConfig: JSON.parse(localStorage.getItem('grid_config') || '{}'),

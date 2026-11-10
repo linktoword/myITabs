@@ -17,6 +17,16 @@ import { removeIconFromCache } from './utils/icons';
 import syncService from './services/syncService';
 import { loadWidgets, saveWidgets } from './widgets/storage';
 import { bindMiddleClickAsLeftClick } from './utils/middleClick';
+import {
+  ACTIVE_CATEGORY_KEY,
+  CATEGORIES_KEY,
+  loadActiveCategoryId,
+  loadStoredBookmarkState,
+  normalizeBookmarkState,
+  resolveActiveCategoryId,
+  saveActiveCategoryId,
+  saveCategories,
+} from './utils/categories';
 
 const DEFAULT_BG_URL = 'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?q=80&w=2070&auto=format&fit=crop';
 
@@ -43,15 +53,13 @@ function App() {
     };
   });
 
-  const [shortcuts, setShortcuts] = useState(() => {
-    const saved = localStorage.getItem('shortcuts');
-    if (saved) return JSON.parse(saved);
-    const defaults = [
-      { id: 1, title: 'Google', url: 'https://google.com' },
-    ];
-    localStorage.setItem('shortcuts', JSON.stringify(defaults));
-    return defaults;
-  });
+  const [bookmarkSeed] = useState(loadStoredBookmarkState);
+  const [shortcuts, setShortcuts] = useState(bookmarkSeed.shortcuts);
+  const [categories, setCategories] = useState(bookmarkSeed.categories);
+  const [activeCategoryId, setActiveCategoryId] = useState(() => (
+    resolveActiveCategoryId(bookmarkSeed.categories, loadActiveCategoryId())
+  ));
+  const resolvedActiveCategoryId = resolveActiveCategoryId(categories, activeCategoryId);
   const [settingsTrigger, setSettingsTrigger] = useState(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [todos, setTodos] = useState(() => {
@@ -71,7 +79,7 @@ function App() {
     : notes[0]?.id || null;
   const [isNotesOpen, setIsNotesOpen] = useState(false);
   const [isDataManagementOpen, setIsDataManagementOpen] = useState(false);
-  const [widgets, setWidgets] = useState(loadWidgets);
+  const [widgets, setWidgets] = useState(bookmarkSeed.widgets);
   const [openWidgetId, setOpenWidgetId] = useState(null);
   const handleWidgetsChange = useCallback((next) => {
     setWidgets(next);
@@ -142,10 +150,19 @@ function App() {
 
         let updated = false;
 
-        if (cloudData.shortcuts) {
+        if (cloudData.shortcuts || cloudData.categories) {
           console.log('Updating shortcuts:', cloudData.shortcuts);
-          setShortcuts(cloudData.shortcuts);
-          localStorage.setItem('shortcuts', JSON.stringify(cloudData.shortcuts));
+          const normalized = normalizeBookmarkState({
+            categories: cloudData.categories ?? JSON.parse(localStorage.getItem(CATEGORIES_KEY) || 'null'),
+            shortcuts: cloudData.shortcuts ?? JSON.parse(localStorage.getItem('shortcuts') || '[]'),
+            widgets: loadWidgets(),
+          });
+          setShortcuts(normalized.shortcuts);
+          setCategories(normalized.categories);
+          setWidgets(normalized.widgets);
+          localStorage.setItem('shortcuts', JSON.stringify(normalized.shortcuts));
+          saveCategories(normalized.categories);
+          saveWidgets(normalized.widgets);
           updated = true;
         }
         if (cloudData.gridConfig) {
@@ -208,12 +225,15 @@ function App() {
 
     // Listen for storage changes (e.g. from Popup)
     const handleStorageChange = (e) => {
-      if (e.key === 'shortcuts') {
-        const newValue = e.newValue;
-        if (newValue) {
-          setShortcuts(JSON.parse(newValue));
-        }
-      }
+      if (e.key !== 'shortcuts' && e.key !== CATEGORIES_KEY) return;
+      const normalized = normalizeBookmarkState({
+        categories: JSON.parse(localStorage.getItem(CATEGORIES_KEY) || 'null'),
+        shortcuts: JSON.parse(localStorage.getItem('shortcuts') || '[]'),
+        widgets: loadWidgets(),
+      });
+      setCategories(normalized.categories);
+      setShortcuts(normalized.shortcuts);
+      setWidgets(normalized.widgets);
     };
     window.addEventListener('storage', handleStorageChange);
 
@@ -250,10 +270,32 @@ function App() {
   }, []);
 
   const handleAddShortcut = (newShortcut) => {
-    const updated = [...shortcuts, newShortcut];
+    const categoryId = newShortcut.categoryId || resolvedActiveCategoryId;
+    const updated = [...shortcuts, { ...newShortcut, categoryId }];
     setShortcuts(updated);
     localStorage.setItem('shortcuts', JSON.stringify(updated));
     updateLocalTimestamp();
+  };
+
+  const handleCategoriesChange = (nextCategories, extras = {}) => {
+    const normalized = normalizeBookmarkState({
+      categories: nextCategories,
+      shortcuts: extras.shortcuts ?? shortcuts,
+      widgets: extras.widgets ?? widgets,
+    });
+    setCategories(normalized.categories);
+    setShortcuts(normalized.shortcuts);
+    setWidgets(normalized.widgets);
+    saveCategories(normalized.categories);
+    localStorage.setItem('shortcuts', JSON.stringify(normalized.shortcuts));
+    saveWidgets(normalized.widgets);
+    updateLocalTimestamp();
+  };
+
+  const handleActiveCategoryChange = (categoryId) => {
+    if (!categoryId) return;
+    setActiveCategoryId(categoryId);
+    saveActiveCategoryId(categoryId);
   };
 
   const handleRemoveShortcut = (id) => {
@@ -351,6 +393,7 @@ function App() {
       try {
         const data = {
           shortcuts,
+          categories,
           gridConfig,
           bgConfig,
           bgUrl,
@@ -377,7 +420,7 @@ function App() {
     const timeoutId = setTimeout(syncData, 2000);
 
     return () => clearTimeout(timeoutId);
-  }, [shortcuts, gridConfig, bgConfig, bgUrl, todos, notes]);
+  }, [shortcuts, categories, gridConfig, bgConfig, bgUrl, todos, notes]);
 
   // Persist todos and pin state
   useEffect(() => {
@@ -395,6 +438,10 @@ function App() {
   useEffect(() => {
     saveWidgets(widgets);
   }, [widgets]);
+
+  useEffect(() => {
+    if (resolvedActiveCategoryId) saveActiveCategoryId(resolvedActiveCategoryId);
+  }, [resolvedActiveCategoryId]);
 
   const handleAddTodo = (text) => {
     const newTodo = {
@@ -505,6 +552,7 @@ function App() {
       todos,
       notes,
       shortcuts,
+      categories,
       gridConfig,
       bgConfig,
       bgUrl
@@ -531,6 +579,7 @@ function App() {
       (data.todos && Array.isArray(data.todos)) ||
       (data.notes && Array.isArray(data.notes)) ||
       (data.shortcuts && Array.isArray(data.shortcuts)) ||
+      (data.categories && Array.isArray(data.categories)) ||
       (data.gridConfig && typeof data.gridConfig === 'object') ||
       (data.bgConfig && typeof data.bgConfig === 'object') ||
       (data.bgUrl && typeof data.bgUrl === 'string');
@@ -556,10 +605,19 @@ function App() {
       importedCount++;
     }
 
-    // Import shortcuts
-    if (data.shortcuts && Array.isArray(data.shortcuts)) {
-      setShortcuts(data.shortcuts);
-      localStorage.setItem('shortcuts', JSON.stringify(data.shortcuts));
+    // Import shortcuts and categories together so old backups still land in「常用」
+    if ((data.shortcuts && Array.isArray(data.shortcuts)) || (data.categories && Array.isArray(data.categories))) {
+      const normalized = normalizeBookmarkState({
+        categories: Array.isArray(data.categories) ? data.categories : [],
+        shortcuts: Array.isArray(data.shortcuts) ? data.shortcuts : shortcuts,
+        widgets,
+      });
+      setShortcuts(normalized.shortcuts);
+      setCategories(normalized.categories);
+      setWidgets(normalized.widgets);
+      localStorage.setItem('shortcuts', JSON.stringify(normalized.shortcuts));
+      saveCategories(normalized.categories);
+      saveWidgets(normalized.widgets);
       importedCount++;
     }
 
@@ -607,6 +665,7 @@ function App() {
         onOpenChange={setIsSettingsOpen}
         widgets={widgets}
         onWidgetsChange={handleWidgetsChange}
+        categories={categories}
       />
       <div className={`fixed right-6 top-1/2 -translate-y-1/2 z-30 flex flex-col items-center gap-3 liquid-glass-fixed rounded-2xl p-3 shadow-xl transition-all ${isSettingsOpen ? 'opacity-50 pointer-events-none scale-95' : 'opacity-100 pointer-events-auto scale-100'}`}>
         <button
@@ -692,7 +751,7 @@ function App() {
         onImport={handleImportData}
       />
       <div
-        className="w-full flex flex-col items-center mt-2"
+        className="mt-2 flex min-h-0 w-full flex-1 flex-col items-center"
         style={{
           marginLeft: isTodoVisible ? 160 : 0,
           transition: 'margin 300ms ease'
@@ -706,7 +765,7 @@ function App() {
         onOpenChange={setOpenWidgetId}
       />
         {gridConfig.showSearchBar && (
-          <div className="w-full flex justify-center">
+          <div className="flex w-full shrink-0 justify-center">
             <div
               style={{
                 width: 'clamp(260px, 75vw, 720px)',
@@ -725,10 +784,14 @@ function App() {
         <ShortcutGrid
           config={gridConfig}
           shortcuts={shortcuts}
+          categories={categories}
+          activeCategoryId={resolvedActiveCategoryId}
           widgets={widgets}
           onRemoveShortcut={handleRemoveShortcut}
           onEditShortcut={handleEditShortcut}
           onReorder={handleReorderShortcuts}
+          onCategoriesChange={handleCategoriesChange}
+          onActiveCategoryChange={handleActiveCategoryChange}
           onWidgetsChange={handleWidgetsChange}
           onOpenWidget={setOpenWidgetId}
           leftOffset={isTodoVisible ? 320 : 0}
