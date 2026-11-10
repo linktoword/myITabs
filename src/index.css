@@ -418,6 +418,34 @@ body {
     animation: suggest-in 200ms cubic-bezier(0.2, 0, 0, 1);
 }
 
+/* 2K 常见 125%/150% 缩放，Chrome 的 backdrop-filter 模糊偏弱，半透明白底会透出壁纸。
+   2K 100% 缩放则靠宽度命中。底色加实，模糊按缩放补回。 */
+@media (min-resolution: 1.25dppx), (min-width: 2200px) {
+    .suggest-panel {
+        background: linear-gradient(
+            180deg,
+            rgba(255, 255, 255, 0.92) 0%,
+            rgba(255, 255, 255, 0.86) 100%
+        );
+        backdrop-filter: blur(64px) saturate(150%);
+        -webkit-backdrop-filter: blur(64px) saturate(150%);
+    }
+}
+
+@media (min-resolution: 1.5dppx) {
+    .suggest-panel {
+        backdrop-filter: blur(72px) saturate(150%);
+        -webkit-backdrop-filter: blur(72px) saturate(150%);
+    }
+}
+
+@media (min-resolution: 2dppx) {
+    .suggest-panel {
+        backdrop-filter: blur(80px) saturate(150%);
+        -webkit-backdrop-filter: blur(80px) saturate(150%);
+    }
+}
+
 .suggest-list {
     overscroll-behavior: contain;
     scrollbar-width: thin;
