@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 import { fileURLToPath } from 'url'
+import jsxSourcePlugin from './vite-plugins/jsx-source-plugin.js'
 
 const rootDir = fileURLToPath(new URL('.', import.meta.url))
 
@@ -126,8 +127,19 @@ const faviconProxyPlugin = () => ({
 })
 
 // https://vitejs.dev/config/
-export default defineConfig({
-  plugins: [react(), faviconProxyPlugin(), baiduSuggestProxyPlugin(), qweatherProxyPlugin()],
+export default defineConfig(({ command, mode }) => ({
+  plugins: [
+    react({
+      babel: {
+        plugins: command === 'serve' && mode === 'development'
+          ? [[jsxSourcePlugin, { rootDir }]]
+          : [],
+      },
+    }),
+    faviconProxyPlugin(),
+    baiduSuggestProxyPlugin(),
+    qweatherProxyPlugin(),
+  ],
   build: {
     outDir: 'dist',
     rollupOptions: {
@@ -137,4 +149,4 @@ export default defineConfig({
       },
     },
   },
-})
+}))
